@@ -3,8 +3,8 @@
 > app-shell はプロジェクト全体の骨格(Tauri v2 + Vite + React + TypeScript、Rust クレート構成、コンポジションルート、ウィンドウ振り分け、品質ツール、CI)を所有する。下流 spec(capture-library / screen-capture / annotation-editor)はタスク 1 の成果物を前提にする。app-shell 自身に他 spec への依存は無い。
 > タスク 1.2・1.5・1.6 は特定の受け入れ基準に対応しない基盤タスクのため、`_Requirements:_` 行を持たない。
 
-- [ ] 1. プロジェクト基盤: アプリ骨格・品質ツール・CI
-- [ ] 1.1 Tauri v2 + Vite + React + TypeScript(strict)のプロジェクトを pnpm で作成する
+- [x] 1. プロジェクト基盤: アプリ骨格・品質ツール・CI
+- [x] 1.1 Tauri v2 + Vite + React + TypeScript(strict)のプロジェクトを pnpm で作成する
   - pnpm をパッケージマネージャとして、Vite + React + TypeScript のフロントエンドと `src-tauri/` の Tauri v2 アプリを File Structure Plan のディレクトリ構成どおりに作成する
   - TypeScript は `strict: true`、`@/` を `src/` に解決するパスエイリアスを TypeScript と Vite の両方に設定する
   - Tauri 設定で identifier を `app.snipt`、起動時に作るウィンドウを 0 枚とし、トレイ用を含むアプリアイコン一式を用意する
@@ -12,14 +12,14 @@
   - 完了状態: `pnpm install` 後に `pnpm build` でフロントエンドが型エラーなくビルドでき、`pnpm tauri dev` で起動してもウィンドウが 1 枚も表示されない
   - _Requirements: 1.1_
 
-- [ ] 1.2 Rust クレートを機能モジュール構成で用意し、各モジュールのスタブを置く
+- [x] 1.2 Rust クレートを機能モジュール構成で用意し、各モジュールのスタブを置く
   - クレートの最小 Rust バージョンを 1.90 に定め、`main.rs` はライブラリ側の起動関数を呼ぶだけにする
   - `shared`、`platform::windows`、`app_shell`、`capture_library`、`screen_capture`、`annotation_editor` の各モジュールを空の骨格として作成する
   - 各機能モジュールに共通シグネチャの `setup`(アプリを受け取り成功を返すだけ)を置き、`app_shell` には第 2 段用の `start` スタブも置く
   - `app_shell` は下流モジュールを参照しないという依存方向をモジュール構成で守る
   - 完了状態: `cargo build` と `cargo test` が成功し、全モジュールの `setup` スタブが公開 API として参照できる
 
-- [ ] 1.3 コンポジションルートにプラグイン登録順と 2 段階 setup を実装する
+- [x] 1.3 コンポジションルートにプラグイン登録順と 2 段階 setup を実装する
   - 公式プラグイン(single-instance を最初に、続けて global-shortcut / autostart / notification / dialog / log)とトレイ機能を有効化した Tauri 依存を追加して登録する。single-instance のコールバックはこの時点ではログ出力のみとする
   - ログの出力先を `%LOCALAPPDATA%\app.snipt\logs` に設定する
   - setup の中で `app_shell::setup` → `capture_library::setup` → `annotation_editor::setup` → `screen_capture::setup` → `app_shell::start` の順に呼び、いずれかの失敗はログを残してアプリ起動失敗として扱う
@@ -27,7 +27,7 @@
   - 完了状態: `pnpm tauri dev` で起動するとログに 5 段の setup がこの順で記録され、2 つ目のプロセスを起動しても常駐プロセスが 1 つのままになる
   - _Requirements: 1.1, 6.1_
 
-- [ ] 1.4 フロントエンドの入口とウィンドウラベルによるビュー振り分けを作る
+- [x] 1.4 フロントエンドの入口とウィンドウラベルによるビュー振り分けを作る
   - 入口で React を起動し、現在のウィンドウラベルに応じて `settings` / `history` / `editor-<captureId>` / `overlay-<monitorIndex>` を各機能のルートコンポーネントへ振り分ける
   - 各機能(app-shell / capture-library / annotation-editor / screen-capture)の公開入口に、規約どおりの名前付き export としてプレースホルダの `SettingsWindow` / `HistoryWindow` / `EditorWindow({ captureId })` / `OverlayWindow({ monitorIndex })` を置き、遅延読み込みする
   - 振り分け表を spec ごとの区画に分け、下流 spec はプレースホルダを置き換えるだけで済むようにする
@@ -35,7 +35,7 @@
   - 完了状態: 各ラベル名から期待するプレースホルダが選ばれることが確認でき、`editor-abc` から `captureId = "abc"`、`overlay-1` から `monitorIndex = 1`(数値)が渡る
   - _Requirements: 1.4, 3.1_
 
-- [ ] 1.5 lint・format・テストのツールを導入する
+- [x] 1.5 lint・format・テストのツールを導入する
   - Rust: rustfmt の設定と、clippy を警告エラー扱い(`-D warnings`)で実行する設定を用意し、`cargo test` が走る最小の単体テストを 1 つ置く
   - TypeScript: ESLint(`any` 禁止を含む TypeScript 向けルール、React Hooks ルール)と Prettier を導入し、互いの整形ルールが衝突しないようにする
   - Vitest を `@/` エイリアス付きで導入し、React コンポーネントを描画して検証できるテスト環境(DOM 環境と Testing Library)と Tauri API のモック方法を整え、1.4 の振り分けロジックの単体テストを置く
@@ -43,7 +43,7 @@
   - lint / format チェック / test をまとめて実行できる pnpm スクリプトを定義する
   - 完了状態: `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`、`pnpm lint`、`pnpm format:check`、`pnpm test` がすべて成功する
 
-- [ ] 1.6 GitHub Actions の CI を windows-latest で構成する
+- [x] 1.6 GitHub Actions の CI を windows-latest で構成する
   - push / pull request で windows-latest 上に Rust(stable、MSVC、clippy・rustfmt 付き)、Node.js 20+、pnpm を用意し、依存をキャッシュする
   - 1.5 の全チェック(rustfmt、clippy、cargo test、ESLint、Prettier、Vitest)と、フロントエンドビルドおよび Tauri アプリのビルド(インストーラのバンドルなし)を実行する
   - 完了状態: ワークフロー定義がリポジトリにあり、いずれかのチェックまたはビルドが失敗したときにジョブが失敗する構成になっている
@@ -267,3 +267,8 @@
   - フェイクの CaptureRequester を使い、押下の解決から request_capture 呼び出しまでが 10ms 未満であることを確認する(2.2 の即時性の補助確認)
   - 完了状態: 計測テストが `cargo test` で成功する
   - _Requirements: 2.2_
+
+## Implementation Notes
+- 1.2/1.3: 各 spec の `setup` と `app_shell::start` は `pub fn setup<R: tauri::Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::Error>>` とランタイムについて汎用にした。本番は `Wry` で design のシグネチャと同じ呼び方になり、テストではモックランタイムで `snipt_lib::setup_specs` を実行できる(`src-tauri/tests/setup.rs`)。
+- 1.3: `platform::windows` は `#[cfg(windows)]` で囲み、Linux でもクレートがビルド・テストできるようにした。
+- 1.5: TypeScript は typescript-eslint の対応範囲に合わせて 6.0 系に固定した(7.0 は未対応)。
