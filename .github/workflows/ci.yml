@@ -15,50 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      # Installs node, pnpm and rust (with clippy and rustfmt) as pinned in mise.toml
+      - uses: jdx/mise-action@v2
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: mise run install
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Frontend checks
+        run: mise run check:web
 
-      - name: ESLint
-        run: pnpm lint
-
-      - name: Prettier
-        run: pnpm format:check
-
-      - name: Vitest
-        run: pnpm test
-
-      - name: Build frontend
-        run: pnpm build
-
-      - name: rustfmt
-        working-directory: src-tauri
-        run: cargo fmt --check
-
-      - name: clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets --locked -- -D warnings
-
-      - name: cargo test
-        working-directory: src-tauri
-        run: cargo test --locked
+      - name: Rust checks
+        run: mise run check:rust
 
       - name: Build app (no bundle)
         run: pnpm tauri build --no-bundle

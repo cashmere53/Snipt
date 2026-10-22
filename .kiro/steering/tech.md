@@ -38,14 +38,15 @@
 ## Development Environment
 
 ### Required Tools
-- Rust (stable, MSVC toolchain), Node.js 20+, pnpm
-- Windows 10/11 + WebView2 Runtime + Visual Studio Build Tools
+- [mise](https://mise.jdx.dev/): Node.js・pnpm・Rust(clippy / rustfmt 付き)のバージョンは `mise.toml` で固定し、`mise install` で揃える。ツールを直接インストールしない
+- Windows 10/11 + WebView2 Runtime + Visual Studio Build Tools(MSVC)
 
 ### Common Commands
 ```bash
-# Dev:   pnpm tauri dev
-# Build: pnpm tauri build
-# Test:  cargo test && pnpm test
+# Setup: mise install && mise run install
+# Dev:   mise run dev
+# Build: mise run build
+# Check: mise run check   # CI と同じ lint / format / test(check:web, check:rust)
 ```
 
 ## Key Technical Decisions
