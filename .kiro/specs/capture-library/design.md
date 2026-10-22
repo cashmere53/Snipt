@@ -594,4 +594,5 @@ export function onLibraryEvent<K extends keyof LibraryEvents>(name: K, handler: 
 - **4.3 の編集画面クローズ(確定)**: annotation-editor が追加した `EditorLauncher::close_editor`(未保存注釈を flush してから閉じる)を削除前に呼ぶ。flush された注釈も同じ削除でごみ箱へ移る
 - **履歴ウィンドウを開く経路(確定)**: app-shell が `history` ラベルのウィンドウを作成 / 前面化し、capture-library は `HistoryWindow` を export するだけ
 - **元画像バイトの所有(確定)**: `read_original_png` サービスは capture-library、WebView 向け command `editor_read_original` は annotation-editor が所有する
-- **要件の未定義点**: 合成済み PNG だけが外部削除された場合(3.7 の対象外)は、項目を残してサムネイルを元画像に戻す。未保存キャプチャ(1.6)はアプリ終了で失われる
+- **要件の未定義点**: 合成済み PNG だけが外部削除された場合(3.7 の対象外)は、項目を残してサムネイルを元画像に戻す。
+- **[確定] 終了時の未保存キャプチャ(1.6)**: `setup` で app-shell の `BeforeExitHooks::register("capture-library", ..)` に登録する。フックは `UnsavedStore` の各項目を現在の保存先へ再保存し(冪等)、残った項目を `ExitCheck.unsaved` に「撮影画像: <CaptureId>」として返す。確認ダイアログは app-shell の要件 7.3–7.5 で表示される

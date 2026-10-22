@@ -238,6 +238,9 @@ flowchart TD
 | 6.1 | 多重起動防止と通知 | Lifecycle, single-instance | `Lifecycle::on_second_instance` | 起動 |
 | 7.1 | 終了時にホットキー解放・全画面を閉じる | Lifecycle, HotkeyManager | `Lifecycle::quit`, `BeforeExitHooks` | — |
 | 7.2 | 画面を閉じても常駐 | Lifecycle | `RunEvent::ExitRequested` 制御 | — |
+| 7.3 | 未保存データがあれば確認を表示 | Lifecycle, BeforeExitHooks | `ExitCheck`, dialog | 終了 |
+| 7.4 | 再試行で再保存し、残れば再確認 | Lifecycle, BeforeExitHooks | `BeforeExitHooks::run_all` | 終了 |
+| 7.5 | キャンセルで常駐継続 | Lifecycle | `Lifecycle::quit` | 終了 |
 
 ## Components and Interfaces
 
@@ -252,7 +255,7 @@ flowchart TD
 | CaptureDispatch | ui-shell | キャプチャ要求の転送 | 1.3, 2.2, 2.5 | CaptureRequester (P0) | Service |
 | ToastNotifier | infra | OS トースト通知 | 2.3, 2.4, 4.3, 6.1 | notification plugin (P0) | Service |
 | AutostartSync | infra | OS 自動起動の同期 | 5.1–5.3 | autostart plugin (P0) | Service |
-| Lifecycle | infra | 終了・常駐継続・二重起動 | 6.1, 7.1, 7.2 | single-instance (P0) | Service |
+| Lifecycle | infra | 終了・常駐継続・二重起動 | 6.1, 7.1–7.5 | single-instance (P0) | Service |
 | Settings Window UI | frontend | 設定の編集 | 3.1–3.7 | `src/shared/ipc/app-shell.ts` (P0) | State |
 | WindowRouter | frontend | ラベル → ビュー | 3.1 | 各機能の export (P1) | — |
 
@@ -452,13 +455,24 @@ pub enum AcceleratorError { NoKey, ModifierRequired, UnknownKey }
 - `ToastNotifier`: `Notifier` 実装。`app.notification().builder().title(..).body(..).show()`、失敗は `log::warn`。案内は本文で完結させる(クリック動作に依存しない)。
 - `AutostartSync::apply(enabled) -> Result<(), String>`: `autolaunch().is_enabled()` と比較して `enable` / `disable`。起動時の第 2 段でも同期(5.1, 5.3)。`cfg(debug_assertions)` では何もしない。起動時の失敗は Notice(Warning)。
 - `Lifecycle::on_second_instance`: 既存側で Notice「Snipt は既に起動しています。通知領域のアイコンから操作できます。」(6.1)。
-- `Lifecycle::quit`(7.1): 二重実行を防ぐフラグを立て、終了用ワーカースレッドで `HotkeyManager::release_all` → `BeforeExitHooks` を登録順に同期実行(全体で最大 5 秒。超過分は待たない)→ メインスレッドで全 `webview_windows()` を `destroy` → `app.exit(0)`。フックはメインスレッド外で走るため、フック内でウィンドウのイベントや IPC の完了を待ってよい。
+- `Lifecycle::quit`(7.1, 7.3–7.5): 二重実行を防ぐフラグを立て、終了用ワーカースレッドで次を行う。
+  1. `BeforeExitHooks::run_all()` で各フックを登録順に同期実行(各フックは自前で最大 3 秒)。各フックは未保存データの保存を試み、保存できずに残ったものを `ExitCheck` で返す。
+  2. 残りが 0 件なら 3 へ。1 件以上なら `tauri-plugin-dialog` で確認を表示(「保存できていないデータが N 件あります」+ 内訳、ボタン: 再試行 / 破棄して終了 / キャンセル)(7.3)。再試行は 1 に戻る(7.4)。キャンセルはフラグを戻して何もせず戻る。ホットキーも画面もそのまま(7.5)。破棄して終了は 3 へ。
+  3. `HotkeyManager::release_all` → メインスレッドで全 `webview_windows()` を `destroy` → `app.exit(0)`(7.1)。
+  フックはメインスレッド外で走るため、フック内でウィンドウのイベントや IPC の完了を待ってよい。ホットキーの解放は確認の後に行うので、キャンセル時に再登録は要らない。
 ```rust
 /// 第 1 段で `Arc<BeforeExitHooks>` として manage。下流は自分の setup で登録する(app-shell は下流に依存しない)。
-pub struct BeforeExitHooks { /* Mutex<Vec<(&'static str, Box<dyn Fn() + Send + Sync>)>> */ }
+pub struct BeforeExitHooks { /* Mutex<Vec<(&'static str, Box<dyn Fn() -> ExitCheck + Send + Sync>)>> */ }
+
+/// フックの結果。保存できずに残ったものを利用者向けの短い説明で返す(例: "注釈: 20261022_173512")。
+#[derive(Debug, Default)]
+pub struct ExitCheck { pub unsaved: Vec<String> }
+
 impl BeforeExitHooks {
-    /// 終了時に呼ばれる。ブロックしてよいが自前のタイムアウトを持つこと(例: annotation-editor の未保存注釈の flush)。
-    pub fn register(&self, name: &'static str, hook: Box<dyn Fn() + Send + Sync + 'static>);
+    /// 終了時に呼ばれる。未保存データの保存を試み、残りを返す。ブロックしてよいが自前のタイムアウトを持つこと。
+    /// 「再試行」のたびに再度呼ばれるため冪等であること。
+    pub fn register(&self, name: &'static str, hook: Box<dyn Fn() -> ExitCheck + Send + Sync + 'static>);
+    pub(crate) fn run_all(&self) -> ExitCheck;
 }
 ```
 - `on_run_event`: `RunEvent::ExitRequested { code: None, api }` は `api.prevent_exit()`、`Some(_)` は許可(7.2)。
@@ -522,5 +536,5 @@ impl BeforeExitHooks {
 - **共有契約への追加(逸脱ではなく具体化、cross-spec レビューで確定)**: `Accelerator`(正規化文字列)、`Notifier` をトレイト + `Notice` 型として定義、`SettingsStore::subscribe` はコールバック方式、下流トレイトは `Arc<dyn Trait>` として managed state に置く、2 段階 setup と各 spec 共通の `setup` シグネチャ、終了前フック `BeforeExitHooks`。
 - **history ウィンドウ(確定)**: app-shell がラベル `history` で生成・前面化し、capture-library は `HistoryWindow` を export するだけ。
 - **フロント入口の export 規約(確定)**: `SettingsWindow` / `HistoryWindow` / `EditorWindow({ captureId })` / `OverlayWindow({ monitorIndex })`。各 spec の設計はこれに合わせた。
-- 終了時(7.1)の未保存注釈は、annotation-editor が `BeforeExitHooks` に登録する flush で保存してから閉じる。flush が 5 秒で終わらない場合や保存に失敗した場合は失われ得る(ログのみ)。
+- **終了時の未保存データ(確定、利用者判断 2026-10-22)**: annotation-editor(未保存注釈の flush)と capture-library(保存に失敗した撮影画像の再保存)が `BeforeExitHooks` に登録し、残りを `ExitCheck` で返す。残りがあれば確認ダイアログ(再試行 / 破棄して終了 / キャンセル)を出す(7.3–7.5)。
 - PrintScreen 予約がレジストリ値と無関係に失敗する環境(他の常駐ツール)では「競合」と区別できない場合があるが、案内文は両方の対処を含むため実害は小さい。

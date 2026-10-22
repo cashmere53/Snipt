@@ -308,7 +308,7 @@ pub struct EditorWindowManager { app: tauri::AppHandle }
 impl EditorLauncher for EditorWindowManager { /* 上記 */ }
 ```
 - Preconditions: `id` は capture-library の形式 `YYYYMMDD_HHMMSS[_NN]`(`CaptureId::parse` 済み、ラベル安全)。`label.rs` でも検証し、違反時は生成せず `EditorError::InvalidCaptureId` をログと通知。
-- 終了フック: `setup` で `BeforeExitHooks::register("annotation-editor", ..)` し、開いている全 `editor-*` に `close_editor` を並行して呼び、全完了(最大 3 秒)を待つ。
+- 終了フック: `setup` で `BeforeExitHooks::register("annotation-editor", ..)` し、開いている全 `editor-*` で未保存の変更を並行して flush する(最大 3 秒、ウィンドウは閉じない)。保存できなかった、または時間内に終わらなかった編集画面を `ExitCheck.unsaved` に「注釈: <CaptureId>」として返す。app-shell が確認ダイアログを出し、「再試行」なら再度呼ばれる(冪等)。ウィンドウの破棄は app-shell が最後に行う。
 - Postconditions: 戻り後まもなく該当ウィンドウが表示・フォーカスされる。同一 id のウィンドウは常に高々 1 つ。
 
 #### editor commands / EditorState / envelope / export
@@ -610,6 +610,6 @@ export interface AutosaveController {
 - **[契約追加・確定] `EditorLauncher::close_editor`**: flush してから閉じる。capture-library が削除前(4.3)に呼ぶ。
 - **[確定] `copy_image`**: capture-library の `ClipboardImage { width, height, rgba, png: Option }` を使う(上記)。
 - **[確定] CaptureId**: capture-library の `YYYYMMDD_HHMMSS[_NN]`(`[0-9_]` のみ)。
-- **[確定] アプリ終了時**: app-shell の `BeforeExitHooks` に flush を登録する。flush 失敗時は 11.3 の再試行 / 破棄を選ばせられず、変更は失われ得る(ログのみ)。
+- **[確定] アプリ終了時**: app-shell の `BeforeExitHooks` に flush を登録し、保存できなかった編集画面を `ExitCheck` で返す。確認(再試行 / 破棄して終了 / キャンセル)は app-shell の要件 7.3–7.5 として app-shell が表示する。
 - **[リスク] 1 秒予算**: ウィンドウ生成 + WebView2 初期化が遅い場合、予備ウィンドウ方式(ラベル規約の変更が必要)を検討。
 - **[リスク] 巨大画像**: canvas 上限超過時は書き出し・自動保存の合成 PNG が作れない(注釈 JSON も保存できない)。発生時は理由を表示する。
