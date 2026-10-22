@@ -272,3 +272,4 @@
 - 1.2/1.3: 各 spec の `setup` と `app_shell::start` は `pub fn setup<R: tauri::Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::Error>>` とランタイムについて汎用にした。本番は `Wry` で design のシグネチャと同じ呼び方になり、テストではモックランタイムで `snipt_lib::setup_specs` を実行できる(`src-tauri/tests/setup.rs`)。
 - 1.3: `platform::windows` は `#[cfg(windows)]` で囲み、Linux でもクレートがビルド・テストできるようにした。
 - 1.5: TypeScript は typescript-eslint の対応範囲に合わせて 6.0 系に固定した(7.0 は未対応)。
+- 1.5(PR #4 のレビューで変更): ESLint + Prettier の代わりに oxlint + oxfmt を使う。Vite 8 の oxc 系ツールに揃えるため。ツールのバージョンは mise(`mise.toml`)で固定し、CI も `mise run check:web` / `check:rust` で実行する。

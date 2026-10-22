@@ -28,7 +28,7 @@
 
 ### Code Quality
 - Rust: `rustfmt` / `clippy`
-- TypeScript: ESLint + Prettier
+- TypeScript: oxlint(`any` 禁止、React Hooks、警告もエラー扱い)+ oxfmt(Vite 8 と同じ oxc 系で揃える)
 
 ### Testing
 - Rust: `cargo test`(キャプチャ以外のロジック、座標変換、保存形式)
