@@ -1,0 +1,77 @@
+.settings {
+  font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+  font-size: 14px;
+  padding: 16px 20px;
+  color: #1f1f1f;
+}
+
+.settings h1 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+.settings fieldset {
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+}
+
+.settings .field {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.settings .save-dir {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings .save-dir output {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.settings .field-error,
+.settings [role="alert"] {
+  color: #b3261e;
+  margin: 2px 0;
+}
+
+.settings .banner {
+  background: #fff4ce;
+  border: 1px solid #e0c060;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.settings .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings {
+    color: #f0f0f0;
+    background: #202020;
+  }
+
+  .settings fieldset {
+    border-color: #555;
+  }
+
+  .settings .banner {
+    background: #433519;
+    border-color: #8a6d1f;
+  }
+
+  .settings .field-error,
+  .settings [role="alert"] {
+    color: #ff8a80;
+  }
+}

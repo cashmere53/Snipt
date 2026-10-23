@@ -5,6 +5,7 @@
   "windows": ["settings"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
     "dialog:allow-open",
     "allow-settings-get",
     "allow-settings-update",
