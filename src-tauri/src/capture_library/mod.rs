@@ -5,11 +5,14 @@
 
 pub mod atomic_fs;
 pub mod events;
+pub mod index;
 pub mod layout;
 pub mod naming;
 pub mod png_meta;
 pub mod ports;
+pub mod thumbnails;
 pub mod types;
+pub mod unsaved;
 
 use tauri::{App, Runtime};
 
