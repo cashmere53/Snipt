@@ -42,8 +42,13 @@ function tooLarge(area: Rect): boolean {
   );
 }
 
-function blockImage(source: ImageSource, shape: Extract<Shape, { kind: "mosaic" }>) {
-  const blocks = pixelate(source.regionPixels(shape.rect), shape.blockSize);
+/** The pixelated original pixels of `rect`, as a canvas to draw at `rect` without smoothing. */
+export function mosaicCanvas(
+  source: ImageSource,
+  rect: Rect,
+  blockSize: number,
+): HTMLCanvasElement {
+  const blocks = pixelate(source.regionPixels(rect), blockSize);
   const canvas = document.createElement("canvas");
   canvas.width = blocks.width;
   canvas.height = blocks.height;
@@ -95,7 +100,12 @@ export function drawComposite(doc: AnnotationDocument, source: ImageSource): HTM
     layer.add(new Konva.Image({ image: source.image, x: 0, y: 0 }));
     for (const shape of doc.shapes) {
       if (shape.kind === "mosaic") {
-        layer.add(new Konva.Image({ ...mosaicAttrs(shape), image: blockImage(source, shape) }));
+        layer.add(
+          new Konva.Image({
+            ...mosaicAttrs(shape),
+            image: mosaicCanvas(source, shape.rect, shape.blockSize),
+          }),
+        );
       }
     }
     for (const shape of doc.shapes) {

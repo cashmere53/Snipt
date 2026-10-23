@@ -53,6 +53,7 @@ export interface EditorState {
 }
 
 export interface EditorActions {
+  /** The crop tool starts cropping; another tool cancels it. */
   setTool(tool: ToolId): void;
   select(ids: readonly ShapeId[]): void;
   /** Records `next` as one undo step; the same document records nothing. */
@@ -177,6 +178,7 @@ export function createEditorStore(options: EditorStoreOptions): StoreApi<EditorS
       setTool: (tool) => {
         if (tool !== "crop" && get().cropDraft !== null) get().cancelCrop();
         set({ tool, selection: tool === "select" ? get().selection : [] });
+        if (tool === "crop" && get().cropDraft === null) get().beginCrop();
       },
 
       select: (ids) => set({ selection: [...ids] }),
