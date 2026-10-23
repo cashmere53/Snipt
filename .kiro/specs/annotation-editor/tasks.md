@@ -27,29 +27,29 @@
   - _Boundary: shared ipc (annotation-editor)_
   - _Requirements: 1.1, 10.4, 11.2_
 
-- [ ] 2. 注釈ドキュメントモデル(純粋 TS、Rust 側と並行可)
-- [ ] 2.1 注釈ドキュメントの型とスタイル設定を定義する
+- [x] 2. 注釈ドキュメントモデル(純粋 TS、Rust 側と並行可)
+- [x] 2.1 注釈ドキュメントの型とスタイル設定を定義する
   - スキーマ版 1 の注釈ドキュメント(元画像サイズ、切り抜き、描画順の図形列)と、矢印・四角・テキスト・モザイク・マーカーの 5 種の図形型を、座標をすべて元画像の物理ピクセルとして定義する
   - スタイル設定(色・線の太さ・文字サイズ・テキスト背景)の型、既定値、色パレット 8 色・太さ・文字サイズの選択肢と、不正値を既定値に置き換える検証を用意する
   - 完了状態: スタイル検証が不正な色・範囲外の数値・欠落フィールドを既定値へ戻すことを Vitest で確認できる
   - _Boundary: model (document, style)_
   - _Requirements: 2.6, 2.7, 5.6_
 
-- [ ] 2.2 (P) 描画時の幾何補助を実装する
+- [x] 2.2 (P) 描画時の幾何補助を実装する
   - 2 点からの矩形正規化、Shift 時の 45 度単位スナップと正方形制約、整数への丸めと画像範囲へのクランプ(面積 0 は無効)を純粋関数として用意する
   - 完了状態: 各方向へのドラッグで 45 度スナップと正方形制約が期待値になり、範囲外・面積 0 の矩形が正しくクランプ / 無効化されることを Vitest で確認できる
   - _Boundary: model (geometry)_
   - _Depends: 2.1_
   - _Requirements: 3.2, 4.2, 6.1, 7.1_
 
-- [ ] 2.3 (P) 不可逆なモザイク計算を実装する
+- [x] 2.3 (P) 不可逆なモザイク計算を実装する
   - 画像長辺に比例し最小 16px のブロックサイズ規則と、ピクセル列をブロック平均の不透明な単一色で置き換える処理を実装する
   - 完了状態: 出力の各ブロックが単一色かつ不透明で、元画素の値が出力に残らない入力例で検証する Vitest が通る
   - _Boundary: model (mosaic)_
   - _Depends: 2.1_
   - _Requirements: 6.1, 6.3_
 
-- [ ] 2.4 (P) 図形操作とマーカー採番を実装する
+- [x] 2.4 (P) 図形操作とマーカー採番を実装する
   - 図形の追加・部分更新・複数削除・切り抜き設定 / 解除を、入力ドキュメントを変更しない純粋関数として実装する
   - マーカー番号は既存の最大番号 + 1(無ければ 1)とし、削除や更新で残りの番号を変えない
   - 完了状態: マーカー削除後も残りの番号が変わらず次の番号が最大 + 1 になること、切り抜き解除で元の範囲に戻ること、元ドキュメントが不変であることを Vitest で確認できる
@@ -57,7 +57,7 @@
   - _Depends: 2.1_
   - _Requirements: 2.3, 2.4, 2.5, 7.2, 8.2, 8.3_
 
-- [ ] 2.5 (P) スナップショット方式の Undo / Redo 履歴を実装する
+- [x] 2.5 (P) スナップショット方式の Undo / Redo 履歴を実装する
   - 過去・現在・未来のスナップショットを持ち、確定ごとに 1 件積み、新しい確定で未来を破棄し、上限 200 件を超えたら最古を捨てる
   - 同一ドキュメントの確定は履歴に積まない
   - 完了状態: 150 件の確定後に 100 回以上 Undo できること、Undo 後の確定で Redo 先が消えること、200 件超で最古が捨てられることを Vitest で確認できる
@@ -65,7 +65,7 @@
   - _Depends: 2.1_
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 2.6 (P) 注釈ドキュメントの読み込み検証と版移行を実装する
+- [x] 2.6 (P) 注釈ドキュメントの読み込み検証と版移行を実装する
   - 未知の値を受け取り、版ごとの移行関数を 1 段ずつ適用してから、色形式・ID 重複・数値範囲・画像サイズとの整合を検証する
   - 未知の新しい版や不正値は失敗理由付きで拒否し、呼び出し側が空ドキュメントで開けるようにする
   - 完了状態: 版 1 の往復、未知の版・不正色・重複 ID の拒否を Vitest で確認できる
@@ -73,7 +73,7 @@
   - _Depends: 2.1_
   - _Requirements: 1.1_
 
-- [ ] 2.7 (P) 保存封筒のエンコードを実装する
+- [x] 2.7 (P) 保存封筒のエンコードを実装する
   - 「4 バイト LE の JSON 長 + UTF-8 JSON + PNG」の 1 本のバイト列に注釈ドキュメントと合成 PNG をまとめる
   - 完了状態: 日本語を含むドキュメントを封筒化し、長さ前置きを読んで JSON と PNG を元通り取り出せることを Vitest で確認できる
   - _Boundary: services (save-envelope)_
@@ -329,5 +329,11 @@
 
 ## Implementation Notes
 - 1.2: capture-library 5.7 の削除で必要になったため、`shared::EditorLauncher` トレイト(`open_editor` / `close_editor`)を design どおりに先に追加した。実装と managed state への登録は 2 以降で行う(それまで capture-library は起動口が無いものとして動く)。
-- 1.1: WebView 側は konva 10.9 / react-konva 19.3.2 / zustand 5.0 を追加した(react-konva 19.3 は React ^19.3.0 を要求し、既存の React 19.3.1 と整合)。Konva のテスト描画は devDependency の `canvas`(node-canvas 3 系、ビルド済みバイナリ)で行う。jsdom は `canvas` が入っていれば `<canvas>` をそれで描くため Vitest の設定変更は不要で、canvas を使うのは編集機能のテストだけ。pnpm 10 はインストールスクリプトを既定で止めるため、`pnpm-workspace.yaml` の `onlyBuiltDependencies` で `canvas` だけ許可した。Windows では canvas の最初の描画で fontconfig がシステムフォントをすべて走査し CI で 1 分以上かかったため、テストではフォントフォルダを持たない `src/test/fonts.conf` を `FONTCONFIG_FILE` で使う(文字は代替グリフで描かれる。文字の見た目を画素で確かめるテストが必要になったらフォントを同梱する)。Rust 側の合成 PNG のデコードは capture-library で導入済みの `png` 0.18 を使い、追加したのは書き出しトークン用の `uuid`(v4)のみ。
+- 1.1: WebView 側は konva 10.9 / react-konva 19.3.2 / zustand 5.0 を追加した(react-konva 19.3 は React ^19.3.0 を要求し、既存の React 19.3.1 と整合)。Konva のテスト描画は devDependency の `canvas`(node-canvas 3 系、ビルド済みバイナリ)で行う。jsdom は `canvas` が入っていれば `<canvas>` をそれで描くため Vitest の設定変更は不要で、canvas を使うのは編集機能のテストだけ。pnpm 10 はインストールスクリプトを既定で止めるため、`pnpm-workspace.yaml` の `onlyBuiltDependencies` で `canvas` だけ許可した。Windows では canvas の最初の描画で fontconfig がシステムフォントをすべて走査し CI で 1 分以上かかったため、テストではフォントフォルダを持たない `src/test/fonts.conf` を `FONTCONFIG_FILE` で使う(文字は代替グリフで描かれる。文字の見た目を画素で確かめるテストが必要になったらフォントを同梱する)。それでも最初の 2D コンテキスト生成に Windows CI で数秒かかるため、描画するテストファイルは `beforeAll(warmUpCanvas, CANVAS_WARM_UP_TIMEOUT)`(`src/test/canvas.ts`)で先に初期化する。Rust 側の合成 PNG のデコードは capture-library で導入済みの `png` 0.18 を使い、追加したのは書き出しトークン用の `uuid`(v4)のみ。
 - 1.3: `src/shared/ipc/annotation-editor.ts` に command 名(`EDITOR_COMMANDS`)・DTO・エラー種別 8 種・`IpcResult` を定義した。終了前フック用に、イベント `editor://flush-request`(payload `{ requestId }`、ウィンドウは閉じない)と、その応答 command `editor_flush_result`(`{ requestId, saved }`)を確定した。command は design の 6 つにこの応答を加えた 7 つになる(登録と capability は 6.x で行う)。外部クローズ要求 `editor://close-request` の payload は無し(`null`)。
+- 2.1: 色パレットは design に色の指定が無いため、赤 `#E53935`(既定)・橙・黄・緑・青・紫・黒・白の 8 色にした。`validateStyle` は色は任意の `#RRGGBB` を受け付け、線の太さと文字サイズは選択肢に含まれる値だけを受け付ける(UI で選べる値と一致させるため)。
+- 2.2: `snapAngle45` は終点をスナップ後の方向へ射影する(ポインタに最も近い点)。`toIntegerRect` は負の幅・高さも受け付ける。
+- 2.3: `pixelate` は `ImageData` と同じ形の `Pixels`(`width` / `height` / `data`)を受け取り、新しい配列で返す。ブロックは左上基準で、右端・下端は部分ブロックになる。
+- 2.4: 変化の無い操作(存在しない ID の更新・削除、同じ切り抜き)は同じドキュメントを返すので、履歴に積まれない。design の Testing Strategy にある「空テキストの確定」は `commitText` にした(空白だけの文字列も空とみなし、既存のテキストなら削除する)。
+- 2.6: 未知のフィールドは読み込み時に捨てる。移行は `migrateDocument` に分け、版 1 が最初の版なので移行関数はまだ無い(段階的な適用と欠けた段の扱いはテスト用の移行関数で確認)。テキスト注釈の空文字と、切り抜き・モザイクの範囲外 / 非整数は不正として拒否する。
+- 2.7: 封筒のエンコードは `services/save-envelope.ts`。JSON 長は UTF-8 のバイト数。
