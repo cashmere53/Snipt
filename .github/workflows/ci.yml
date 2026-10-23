@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs node, pnpm and rust (with clippy and rustfmt) as pinned in mise.toml
+      - uses: jdx/mise-action@v2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: mise run install
+
+      - name: Frontend checks
+        run: mise run check:web
+
+      - name: Rust checks
+        run: mise run check:rust
+
+      - name: Build app (no bundle)
+        run: pnpm tauri build --no-bundle
