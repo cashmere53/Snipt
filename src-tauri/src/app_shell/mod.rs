@@ -4,6 +4,7 @@
 //! annotation_editor); downstream specs plug in through traits in `crate::shared`.
 
 pub mod hotkeys;
+pub mod settings;
 
 use tauri::{App, Runtime};
 

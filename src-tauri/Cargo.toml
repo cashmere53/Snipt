@@ -38,6 +38,7 @@ windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Regi
 
 [dev-dependencies]
 tauri = { version = "2", features = ["tray-icon", "test"] }
+tempfile = "3"
 
 [profile.release]
 codegen-units = 1
