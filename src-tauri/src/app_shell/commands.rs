@@ -4,10 +4,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, Runtime, State};
 
 use super::hotkeys::{HotkeyManager, HotkeyStatus};
 use super::service::{SettingsService, SettingsUpdateError};
+use super::tray;
 use crate::shared::Settings;
 
 #[tauri::command]
@@ -33,9 +34,15 @@ pub fn hotkeys_status(hotkeys: State<'_, Arc<HotkeyManager>>) -> Vec<HotkeyStatu
     hotkeys.statuses()
 }
 
+/// Also updates the tray tooltip, since the region hotkey may now be registered.
 #[tauri::command]
-pub fn hotkeys_retry(hotkeys: State<'_, Arc<HotkeyManager>>) -> Vec<HotkeyStatus> {
-    hotkeys.retry_failed()
+pub fn hotkeys_retry<R: Runtime>(
+    app: AppHandle<R>,
+    hotkeys: State<'_, Arc<HotkeyManager>>,
+) -> Vec<HotkeyStatus> {
+    let statuses = hotkeys.retry_failed();
+    tray::refresh_from_state(&app);
+    statuses
 }
 
 /// While the settings window captures a key combination.
@@ -44,9 +51,11 @@ pub fn hotkeys_suspend(hotkeys: State<'_, Arc<HotkeyManager>>) {
     hotkeys.suspend();
 }
 
+/// Resuming registers the keys again, which may change what the tooltip shows.
 #[tauri::command]
-pub fn hotkeys_resume(hotkeys: State<'_, Arc<HotkeyManager>>) {
+pub fn hotkeys_resume<R: Runtime>(app: AppHandle<R>, hotkeys: State<'_, Arc<HotkeyManager>>) {
     hotkeys.resume();
+    tray::refresh_from_state(&app);
 }
 
 /// Command names, in the order listed in `build.rs` (`AppManifest::commands`).

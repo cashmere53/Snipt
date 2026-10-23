@@ -37,10 +37,6 @@ impl SettingsStore {
     }
 
     /// Loads `settings.json` at `path`, falling back to the defaults derived from `picture_dir`.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "wired into stage-1 setup in task 9.1")
-    )]
     pub(crate) fn load(path: PathBuf, picture_dir: &Path) -> (SettingsStore, LoadOutcome) {
         let file = SettingsFile::new(path, picture_dir);
         let (settings, outcome) = file.load();

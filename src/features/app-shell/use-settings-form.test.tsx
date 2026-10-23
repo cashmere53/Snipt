@@ -133,4 +133,11 @@ describe("errorsFromUpdateError", () => {
   ])("routes %o", (error, expected) => {
     expect(errorsFromUpdateError(error)).toEqual(expected);
   });
+
+  it("shows an unstructured rejection on the form", () => {
+    expect(errorsFromUpdateError("ipc timeout")).toEqual({
+      hotkeys: {},
+      form: "設定を保存できませんでした: ipc timeout",
+    });
+  });
 });

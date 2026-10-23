@@ -11,19 +11,8 @@ pub mod lifecycle;
 pub mod notifier;
 pub mod service;
 pub mod settings;
+pub mod startup;
 pub mod tray;
 pub mod windows;
 
-use tauri::{App, Runtime};
-
-/// Stage 1: load settings and manage shared services before downstream setup runs.
-pub fn setup<R: Runtime>(_app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
-    log::info!("setup: app-shell (stage 1)");
-    Ok(())
-}
-
-/// Stage 2: create the tray, register hotkeys and sync autostart.
-pub fn start<R: Runtime>(_app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
-    log::info!("setup: app-shell (stage 2)");
-    Ok(())
-}
+pub use startup::{on_second_instance, on_shortcut, setup, start};
