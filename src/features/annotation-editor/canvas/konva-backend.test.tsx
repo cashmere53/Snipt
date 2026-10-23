@@ -3,13 +3,16 @@
 import { render } from "@testing-library/react";
 import Konva from "konva";
 import { Layer, Rect, Stage } from "react-konva";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { CANVAS_WARM_UP_TIMEOUT, warmUpCanvas } from "@/test/canvas";
 
 function pixelAt(canvas: HTMLCanvasElement, x: number, y: number): number[] {
   return [...canvas.getContext("2d")!.getImageData(x, y, 1, 1).data];
 }
 
 describe("Konva on jsdom", () => {
+  beforeAll(warmUpCanvas, CANVAS_WARM_UP_TIMEOUT);
+
   it("draws a stage into one canvas", () => {
     const container = document.createElement("div");
     const stage = new Konva.Stage({ container, width: 4, height: 3 });
