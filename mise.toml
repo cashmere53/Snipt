@@ -29,6 +29,11 @@ run = [
   "cargo test --locked",
 ]
 
+[tasks."perf:library"]
+description = "Measure capture-library performance (release build; prints the results)"
+dir = "src-tauri"
+run = "cargo test --release --locked --lib capture_library::perf_tests -- --ignored --nocapture --test-threads=1"
+
 [tasks.check]
 description = "Run every check that CI runs"
 depends = ["check:web", "check:rust"]
