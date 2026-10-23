@@ -25,7 +25,7 @@ export const EDITOR_COMMANDS = {
 
 export type EditorCommand = (typeof EDITOR_COMMANDS)[keyof typeof EDITOR_COMMANDS];
 
-/** Names the export target chosen by `editor_pick_export_path`. */
+/** Request header of `editor_write_export` carrying `ExportTargetDto.token` from `editor_pick_export_path`. */
 export const EXPORT_TOKEN_HEADER = "x-snipt-export-token";
 
 export interface EditorSessionDto {
