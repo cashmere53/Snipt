@@ -9,7 +9,7 @@ pub mod platform;
 pub mod screen_capture;
 pub mod shared;
 
-use tauri::{App, Runtime};
+use tauri::{App, AppHandle, RunEvent, Runtime};
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Runs every spec's `setup` in dependency order, then app-shell's second stage.
@@ -19,10 +19,16 @@ use tauri_plugin_log::{Target, TargetKind};
 /// and registers hotkeys once every downstream trait implementation is in place.
 pub fn setup_specs<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
     app_shell::setup(app)?;
+    setup_downstream(app)?;
+    app_shell::start(app)?;
+    Ok(())
+}
+
+/// The downstream specs' `setup`, in dependency order, between app-shell's two stages.
+pub fn setup_downstream<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
     capture_library::setup(app)?;
     annotation_editor::setup(app)?;
     screen_capture::setup(app)?;
-    app_shell::start(app)?;
     Ok(())
 }
 
@@ -30,10 +36,14 @@ pub fn setup_specs<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::erro
 pub fn run() {
     let builder = tauri::Builder::default()
         // --- app-shell --- (single-instance must be registered first)
-        .plugin(tauri_plugin_single_instance::init(|_app, argv, _cwd| {
-            log::info!("second instance started: {argv:?}");
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            app_shell::on_second_instance(app, &argv);
         }))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(app_shell::on_shortcut)
+                .build(),
+        )
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -66,6 +76,19 @@ pub fn run() {
             // --- screen-capture ---
             // --- annotation-editor ---
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Snipt");
+        .build(tauri::generate_context!())
+        .expect("error while building Snipt")
+        .run(on_run_event);
+}
+
+fn on_run_event<R: Runtime>(_app: &AppHandle<R>, event: RunEvent) {
+    // --- app-shell --- (closing the last window must not end the tray app)
+    if let RunEvent::ExitRequested { code, api, .. } = &event {
+        if app_shell::lifecycle::Lifecycle::should_prevent_exit(*code) {
+            api.prevent_exit();
+        }
+    }
+    // --- capture-library ---
+    // --- screen-capture ---
+    // --- annotation-editor ---
 }

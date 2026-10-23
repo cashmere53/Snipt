@@ -4,11 +4,12 @@ use std::sync::Arc;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 
 use super::dispatch::CaptureDispatch;
-use super::hotkeys::{accelerator, HotkeyStatus};
+use super::hotkeys::{accelerator, HotkeyManager, HotkeyStatus};
 use super::lifecycle::Lifecycle;
+use super::settings::SettingsStore;
 use super::windows::WindowManager;
 use crate::shared::{CaptureMode, Settings};
 
@@ -198,6 +199,19 @@ pub fn refresh_tooltip<R: Runtime>(tray: &TrayIcon<R>, text: &str) {
     if let Err(e) = tray.set_tooltip(Some(text)) {
         log::warn!("tray: could not update tooltip: {e}");
     }
+}
+
+/// Rebuilds the tooltip from the managed `SettingsStore` and `HotkeyManager`. Does nothing
+/// before stage 2 has created the tray.
+pub fn refresh_from_state<R: Runtime>(app: &AppHandle<R>) {
+    let (Some(tray), Some(store), Some(hotkeys)) = (
+        app.tray_by_id(TRAY_ID),
+        app.try_state::<Arc<SettingsStore>>(),
+        app.try_state::<Arc<HotkeyManager>>(),
+    ) else {
+        return;
+    };
+    refresh_tooltip(&tray, &tooltip_text(&store.get(), &hotkeys.statuses()));
 }
 
 #[cfg(test)]
