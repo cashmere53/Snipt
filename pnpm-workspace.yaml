@@ -1,0 +1,3 @@
+onlyBuiltDependencies:
+  # Prebuilt native binding for the editor tests (jsdom draws canvases with it).
+  - canvas

@@ -3,8 +3,8 @@
 > 前提: プロジェクト雛形(Tauri / Vite / React / TS、モジュールの空実装、コンポジションルートと二段階 setup、ウィンドウ振り分けとプレースホルダ画面、Lint / Vitest / CI)は app-shell の tasks が用意する。本計画はそれを前提とし、雛形タスクを含まない。
 > 並行の目安: 2(注釈モデル、純粋 TS)と 3(Rust 側)は 1 の完了後に並行して進められる。
 
-- [ ] 1. 基盤: 編集機能の依存と共有契約
-- [ ] 1.1 編集機能専用の依存とテスト実行環境を追加する
+- [x] 1. 基盤: 編集機能の依存と共有契約
+- [x] 1.1 編集機能専用の依存とテスト実行環境を追加する
   - WebView 側に konva 10 系、react-konva 19.3 系、zustand 5 系を追加し、react-konva が要求する React 19.3 以上と整合していることを確認する
   - Rust 側に合成 PNG のデコード用クレートと、書き出しトークン生成用の UUID クレートを追加する
   - Vitest で Konva を Node 上で描画できるよう、編集機能のテストに限って DOM と canvas バックエンドを使う設定を加える
@@ -20,7 +20,7 @@
   - _Depends: capture-library: CaptureId_
   - _Requirements: 1.1, 1.4, 1.5, 11.2_
 
-- [ ] 1.3 (P) 編集画面用 IPC 契約の TypeScript 型を定義する
+- [x] 1.3 (P) 編集画面用 IPC 契約の TypeScript 型を定義する
   - 6 つの command 名、セッション DTO、書き出し先 DTO、書き出し形式、エラー種別とエラー DTO、成功 / 失敗の結果型を、Rust 側と一対一になるよう共有 IPC 型として定義する
   - 外部クローズ要求イベントに加え、終了前フック用の「閉じずに flush する」要求と、その結果を Rust へ返す応答経路を同じ場所で定義する(design は名前を定めていないため、ここで名称と payload を確定し、capability にも反映する前提とする)
   - 完了状態: 型定義が `tsc --noEmit` を通り、エラー種別の列挙が design の 8 種と一致している
@@ -329,3 +329,5 @@
 
 ## Implementation Notes
 - 1.2: capture-library 5.7 の削除で必要になったため、`shared::EditorLauncher` トレイト(`open_editor` / `close_editor`)を design どおりに先に追加した。実装と managed state への登録は 2 以降で行う(それまで capture-library は起動口が無いものとして動く)。
+- 1.1: WebView 側は konva 10.9 / react-konva 19.3.2 / zustand 5.0 を追加した(react-konva 19.3 は React ^19.3.0 を要求し、既存の React 19.3.1 と整合)。Konva のテスト描画は devDependency の `canvas`(node-canvas 3 系、ビルド済みバイナリ)で行う。jsdom は `canvas` が入っていれば `<canvas>` をそれで描くため Vitest の設定変更は不要で、canvas を使うのは編集機能のテストだけ。pnpm 10 はインストールスクリプトを既定で止めるため、`pnpm-workspace.yaml` の `onlyBuiltDependencies` で `canvas` だけ許可した。Rust 側の合成 PNG のデコードは capture-library で導入済みの `png` 0.18 を使い、追加したのは書き出しトークン用の `uuid`(v4)のみ。
+- 1.3: `src/shared/ipc/annotation-editor.ts` に command 名(`EDITOR_COMMANDS`)・DTO・エラー種別 8 種・`IpcResult` を定義した。終了前フック用に、イベント `editor://flush-request`(payload `{ requestId }`、ウィンドウは閉じない)と、その応答 command `editor_flush_result`(`{ requestId, saved }`)を確定した。command は design の 6 つにこの応答を加えた 7 つになる(登録と capability は 6.x で行う)。外部クローズ要求 `editor://close-request` の payload は無し(`null`)。
