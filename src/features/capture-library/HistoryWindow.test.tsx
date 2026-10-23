@@ -108,6 +108,29 @@ describe("HistoryWindow", () => {
     expect(screen.getByRole("alertdialog")).toHaveTextContent("1 件のキャプチャ");
   });
 
+  it("focuses the context menu, moves with arrow keys and closes on an outside click", async () => {
+    await renderWindow();
+
+    fireEvent.contextMenu(tile(1));
+    const open = screen.getByRole("menuitem", { name: "編集画面で開く" });
+    expect(open).toHaveFocus();
+    fireEvent.keyDown(open, { key: "ArrowDown" });
+    expect(screen.getByRole("menuitem", { name: "コピー" })).toHaveFocus();
+    fireEvent.keyDown(open, { key: "ArrowUp" });
+    fireEvent.keyDown(open, { key: "ArrowUp" });
+    expect(screen.getByRole("menuitem", { name: "削除" })).toHaveFocus();
+
+    fireEvent.pointerDown(screen.getByTestId("history-menu-dismiss"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("selects everything with Ctrl+A, also with Caps Lock on", async () => {
+    await renderWindow();
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "A", ctrlKey: true });
+    expect(tile(1)).toHaveAttribute("aria-selected", "true");
+    expect(tile(2)).toHaveAttribute("aria-selected", "true");
+  });
+
   it("opens a capture on double click", async () => {
     const mock = await renderWindow();
     fireEvent.doubleClick(tile(2));

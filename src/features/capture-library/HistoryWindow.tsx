@@ -31,6 +31,20 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
+// The context menu takes focus on open; arrow keys move between its enabled items.
+function focusFirstItem(menuElement: HTMLDivElement | null) {
+  menuElement?.querySelector<HTMLButtonElement>("button:enabled")?.focus();
+}
+
+function onMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:enabled")];
+  const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const step = event.key === "ArrowDown" ? 1 : -1;
+  buttons[(at + step + buttons.length) % buttons.length]?.focus();
+}
+
 export function HistoryWindow() {
   const { items, loading } = useHistoryItems();
   const order = useMemo(() => items.map((item) => item.id), [items]);
@@ -89,7 +103,7 @@ export function HistoryWindow() {
     if (event.key === "Delete") {
       event.preventDefault();
       askDelete();
-    } else if (event.key === "a" && (event.ctrlKey || event.metaKey)) {
+    } else if (event.key.toLowerCase() === "a" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       setSelection(selectAll(order));
     } else if (event.key === "Escape") {
@@ -139,11 +153,25 @@ export function HistoryWindow() {
         <HistoryGrid items={items} selection={selection} actions={actions} />
       )}
       {menu !== null && (
+        // Clicking anywhere outside the menu closes it.
         <div
+          className="history-menu-dismiss"
+          data-testid="history-menu-dismiss"
+          onPointerDown={() => setMenu(null)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setMenu(null);
+          }}
+        />
+      )}
+      {menu !== null && (
+        <div
+          ref={focusFirstItem}
           role="menu"
           aria-label="キャプチャの操作"
           className="history-menu"
           style={{ left: menu.x, top: menu.y }}
+          onKeyDown={onMenuKeyDown}
         >
           {menuItem(
             "編集画面で開く",

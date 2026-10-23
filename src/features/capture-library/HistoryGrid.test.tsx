@@ -71,7 +71,7 @@ describe("HistoryGrid", () => {
     fireEvent.scroll(grid);
     const scrolled = screen.getAllByRole("option");
     expect(scrolled).toHaveLength((VISIBLE_ROWS + 2) * COLUMNS);
-    // Rows 99..104 are rendered: the first tile is item 99 * COLUMNS.
+    // Rows 99..103 are rendered: the first tile is item 99 * COLUMNS.
     expect(container.querySelector("img")).toHaveAttribute(
       "src",
       expect.stringContaining(encodeURIComponent(`${items[99 * COLUMNS]!.id}.png`)),
