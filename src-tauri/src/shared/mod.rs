@@ -12,4 +12,7 @@ pub use capture::{CaptureMode, CaptureRequester};
 pub use notify::{Notice, NoticeLevel, Notifier};
 pub use settings::{Accelerator, FullscreenTarget, HotkeySettings, Settings};
 // --- capture-library ---
+mod capture_id;
+
+pub use capture_id::{CaptureId, InvalidCaptureId};
 // --- annotation-editor ---
