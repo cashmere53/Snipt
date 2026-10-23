@@ -23,6 +23,12 @@ fn main() {
         "hotkeys_suspend",
         "hotkeys_resume",
         // --- capture-library ---
+        "library_list",
+        "library_open_in_editor",
+        "library_copy",
+        "library_reveal",
+        "library_delete",
+        "library_prune_missing",
         // --- screen-capture ---
         // --- annotation-editor ---
     ];
