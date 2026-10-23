@@ -284,3 +284,4 @@
 - 5.1: `ToastNotifier` は表示処理を差し替えられる形にして、表示失敗のテストを OS に依存せず行う。通知の内容はレベルに応じたログにも残す。
 - 5.2: `AutostartSync::new` はデバッグビルドで OS 側を変更しない。テストは OS 変更ありの内部コンストラクタでフェイクを使う。
 - 5.4: `BeforeExitHooks` / `ExitCheck` は `crate::shared` からも参照できる。`run_all` はロックを外してから登録順にフックを呼ぶので、フックの中から `register` しても固まらない。`run_all` は 7.x(終了処理)で使うまで `expect(dead_code)` を付けている。
+- 5.x(CI で判明): Windows ではライブラリの単体テストの実行ファイルにも Common Controls v6 のマニフェストが必要になった(無いと STATUS_ENTRYPOINT_NOT_FOUND)。`build.rs` は tauri-build のマニフェスト埋め込みを止め、`windows-app-manifest.xml` を全リンク対象(アプリ本体・単体テスト・結合テスト)へ `/MANIFEST:EMBED` で埋め込む。

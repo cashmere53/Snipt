@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <!-- Test executables do not get the app manifest that tauri-build embeds into the binary,
-       so they load comctl32 v5 and fail with STATUS_ENTRYPOINT_NOT_FOUND (TaskDialogIndirect). -->
+  <!-- Embedded by build.rs into every linked target (app, unit tests, integration tests).
+       Without it, test executables load comctl32 v5 and fail with STATUS_ENTRYPOINT_NOT_FOUND
+       (TaskDialogIndirect). Same content as tauri-build's default app manifest. -->
   <dependency>
     <dependentAssembly>
       <assemblyIdentity
