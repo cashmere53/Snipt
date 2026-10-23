@@ -48,29 +48,29 @@
   - 1.5 の全チェック(rustfmt、clippy、cargo test、ESLint、Prettier、Vitest)と、フロントエンドビルドおよび Tauri アプリのビルド(インストーラのバンドルなし)を実行する
   - 完了状態: ワークフロー定義がリポジトリにあり、いずれかのチェックまたはビルドが失敗したときにジョブが失敗する構成になっている
 
-- [ ] 2. 共有契約とアクセラレータ
-- [ ] 2.1 下流と共有する Rust の型とトレイトを定義する
+- [x] 2. 共有契約とアクセラレータ
+- [x] 2.1 下流と共有する Rust の型とトレイトを定義する
   - キャプチャ種別、キャプチャ要求の受け口トレイト(非ブロッキング、busy 時の無視は実装側の責任)、通知の重要度・通知内容・通知トレイトを定義する
   - 設定(3 つのホットキー、全画面の対象、保存先フォルダ、自動起動)とホットキー設定・全画面対象・正規化済みアクセラレータ文字列を、design のシリアライズ表記(camelCase)で定義する
   - ピクチャフォルダを受け取って既定値(PrintScreen / Ctrl+PrintScreen / Shift+PrintScreen、カーソルのあるモニタ、`<ピクチャ>\Snipt`、自動起動有効)を作る生成関数を用意する
   - 完了状態: 単体テストで既定値の 3 キー・保存先・自動起動有効が確認でき、設定を JSON にすると design の永続形式と同じキー名・値表記になる
   - _Requirements: 1.3, 2.1, 2.2, 3.2, 4.4, 5.3_
 
-- [ ] 2.2 (P) WebView 側の IPC 契約を Rust と一対一で定義する
+- [x] 2.2 (P) WebView 側の IPC 契約を Rust と一対一で定義する
   - キャプチャ種別、全画面対象、ブランド付きアクセラレータ、設定、ホットキー状態、失敗種別、設定更新エラー(6 種)の型を定義する
   - `settings_get` / `settings_update` / `settings_check_save_dir` / `hotkeys_status` / `hotkeys_retry` / `hotkeys_suspend` / `hotkeys_resume` の型付きラッパーと、設定変更イベント名を提供する
   - 完了状態: 型チェックが通り、Vitest でラッパーが正しい command 名と引数で呼び出すこと(invoke をモック)が確認できる
   - _Boundary: src/shared/ipc_
   - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.7, 3.8_
 
-- [ ] 2.3 (P) Windows の PrintScreen 予約設定を読む platform アダプタを作る
+- [x] 2.3 (P) Windows の PrintScreen 予約設定を読む platform アダプタを作る
   - `windows` クレート依存を追加し、現在のユーザーのキーボード設定から「PrintScreen キーで画面キャプチャを開く」の値を読み、有効 / 無効 / 値なしを返す
   - 読み取り失敗は値なしとして扱い、パニックしない
   - 完了状態: Windows 上の単体テストで呼び出しが値(有効 / 無効 / なし)のいずれかを返して終了する
   - _Boundary: platform keyboard_settings_
   - _Requirements: 2.4_
 
-- [ ] 2.4 アクセラレータの正規化・検証・変換・表示を実装する
+- [x] 2.4 アクセラレータの正規化・検証・変換・表示を実装する
   - 入力文字列を修飾子順(Ctrl, Alt, Shift, Win)と W3C のキー名に正規化し、非修飾キーが無い・修飾なしで許されないキー(文字キー単独など)・未知のキーを区別して拒否する。修飾なしは PrintScreen、F1〜F24、Pause、ScrollLock のみ許す
   - 正規化済みアクセラレータを global-shortcut のショートカットへ変換し、利用者向けの表示文字列(例「Ctrl + PrintScreen」)を作る
   - 完了状態: 単体テストで PrintScreen と Ctrl+PrintScreen の往復、修飾子順の正規化、文字キー単独の拒否が確認できる
@@ -273,3 +273,5 @@
 - 1.3: `platform::windows` は `#[cfg(windows)]` で囲み、Linux でもクレートがビルド・テストできるようにした。
 - 1.5: TypeScript は typescript-eslint の対応範囲に合わせて 6.0 系に固定した(7.0 は未対応)。
 - 1.5(PR #4 のレビューで変更): ESLint + Prettier の代わりに oxlint + oxfmt を使う。Vite 8 の oxc 系ツールに揃えるため。ツールのバージョンは mise(`mise.toml`)で固定し、CI も `mise run check:web` / `check:rust` で実行する。
+- 2.1: `Accelerator` は `pub(crate) fn from_normalized` でのみ生成する。serde の読み込みは検証を通らないため、設定ファイル読み込み(3.2)で `accelerator::parse` による再検証を行う。
+- 2.4: キー名は W3C の `KeyboardEvent.code` と大文字小文字まで一致させる(`printscreen` は不可)。修飾子名は大文字小文字を問わず、`Control` / `Meta` / `Super` などの別名も受け付けて正規化する。
