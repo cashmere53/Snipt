@@ -4,10 +4,12 @@
 //! annotation_editor); downstream specs plug in through traits in `crate::shared`.
 
 pub mod autostart;
+pub mod commands;
 pub mod dispatch;
 pub mod hotkeys;
 pub mod lifecycle;
 pub mod notifier;
+pub mod service;
 pub mod settings;
 
 use tauri::{App, Runtime};

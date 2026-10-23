@@ -140,4 +140,19 @@ pub mod fake {
             Ok(())
         }
     }
+
+    /// Lets a test keep a handle to the fake that a `HotkeyManager` owns.
+    impl ShortcutBackend for std::sync::Arc<FakeBackend> {
+        fn register(&self, accelerator: &Accelerator) -> Result<(), BackendError> {
+            FakeBackend::register(self, accelerator)
+        }
+
+        fn unregister(&self, accelerator: &Accelerator) -> Result<(), BackendError> {
+            FakeBackend::unregister(self, accelerator)
+        }
+
+        fn unregister_all(&self) -> Result<(), BackendError> {
+            FakeBackend::unregister_all(self)
+        }
+    }
 }

@@ -55,6 +55,13 @@ pub fn run() {
         .setup(|app| setup_specs(app).inspect_err(|e| log::error!("startup failed: {e}")))
         .invoke_handler(tauri::generate_handler![
             // --- app-shell ---
+            app_shell::commands::settings_get,
+            app_shell::commands::settings_update,
+            app_shell::commands::settings_check_save_dir,
+            app_shell::commands::hotkeys_status,
+            app_shell::commands::hotkeys_retry,
+            app_shell::commands::hotkeys_suspend,
+            app_shell::commands::hotkeys_resume,
             // --- capture-library ---
             // --- screen-capture ---
             // --- annotation-editor ---
