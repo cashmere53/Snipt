@@ -201,17 +201,47 @@ pub fn refresh_tooltip<R: Runtime>(tray: &TrayIcon<R>, text: &str) {
     }
 }
 
+/// The notification-area icon as startup sees it, so tests can run startup without a desktop.
+pub trait TrayHost: Send + Sync + 'static {
+    fn create(&self, targets: Arc<dyn TrayTargets>, tooltip: &str) -> tauri::Result<()>;
+    /// Does nothing before `create`.
+    fn set_tooltip(&self, text: &str);
+}
+
+/// Production host: the Tauri tray icon with id `TRAY_ID`.
+pub struct AppTray<R: Runtime> {
+    app: AppHandle<R>,
+}
+
+impl<R: Runtime> AppTray<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
+        Self { app }
+    }
+}
+
+impl<R: Runtime> TrayHost for AppTray<R> {
+    fn create(&self, targets: Arc<dyn TrayTargets>, tooltip: &str) -> tauri::Result<()> {
+        create(&self.app, targets, tooltip).map(|_| ())
+    }
+
+    fn set_tooltip(&self, text: &str) {
+        if let Some(tray) = self.app.tray_by_id(TRAY_ID) {
+            refresh_tooltip(&tray, text);
+        }
+    }
+}
+
 /// Rebuilds the tooltip from the managed `SettingsStore` and `HotkeyManager`. Does nothing
-/// before stage 2 has created the tray.
+/// before stage 1 has run.
 pub fn refresh_from_state<R: Runtime>(app: &AppHandle<R>) {
     let (Some(tray), Some(store), Some(hotkeys)) = (
-        app.tray_by_id(TRAY_ID),
+        app.try_state::<Arc<dyn TrayHost>>(),
         app.try_state::<Arc<SettingsStore>>(),
         app.try_state::<Arc<HotkeyManager>>(),
     ) else {
         return;
     };
-    refresh_tooltip(&tray, &tooltip_text(&store.get(), &hotkeys.statuses()));
+    tray.set_tooltip(&tooltip_text(&store.get(), &hotkeys.statuses()));
 }
 
 #[cfg(test)]

@@ -7,6 +7,8 @@ pub mod autostart;
 pub mod commands;
 pub mod dispatch;
 pub mod hotkeys;
+#[cfg(test)]
+mod integration_tests;
 pub mod lifecycle;
 pub mod notifier;
 pub mod service;
