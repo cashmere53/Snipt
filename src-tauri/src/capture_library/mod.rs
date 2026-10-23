@@ -4,6 +4,7 @@
 //! call into it.
 
 pub mod events;
+pub mod ports;
 pub mod types;
 
 use tauri::{App, Runtime};

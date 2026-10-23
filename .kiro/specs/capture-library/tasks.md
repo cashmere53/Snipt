@@ -40,8 +40,8 @@
   - _Depends: app-shell: TS 共有型 CaptureMode_
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.2, 5.2_
 
-- [ ] 2. OS アダプタ(他 spec と共有)
-- [ ] 2.1 (P) 画像クリップボードアダプタを作る
+- [x] 2. OS アダプタ(他 spec と共有)
+- [x] 2.1 (P) 画像クリップボードアダプタを作る
   - 1 回のクリップボード操作内で、アルファ付き CF_DIBV5(ボトムアップ)と登録形式 "PNG" の両方を設定する。PNG が渡されないときは高速圧縮で作る
   - 他プロセスが使用中のときは短い間隔で最大 10 回再試行し、駄目なら「使用中」エラーを返す。呼び出しスレッドを選ばない
   - RGBA から DIBV5 ヘッダと画素列への変換を純粋関数に分け、単体テストする
@@ -50,14 +50,14 @@
   - _Depends: app-shell: プロジェクト雛形(platform モジュール)_
   - _Requirements: 3.5_
 
-- [ ] 2.2 (P) シェル操作アダプタを作る
+- [x] 2.2 (P) シェル操作アダプタを作る
   - 複数パスをまとめてごみ箱へ移動する、ファイルを選択した状態でエクスプローラーを開く、フォルダに隠し属性を付ける、の 3 操作を用意する
   - 完了時: Windows 上の一時フォルダで、ごみ箱移動後に元パスが消えて復元でき、隠し属性が付き、表示操作でエクスプローラーが該当ファイルを選択して開く
   - _Boundary: platform shell_
   - _Depends: 1.1_
   - _Requirements: 1.5, 3.6, 4.2_
 
-- [ ] 2.3 デスクトップ操作の差し替え口を作る
+- [x] 2.3 デスクトップ操作の差し替え口を作る
   - ごみ箱・表示・クリップボードの 3 操作をまとめた差し替え可能な口と、2.1 / 2.2 を呼ぶ本番実装を用意し、失敗を保管庫エラー(shell / clipboard 種別)に写像する
   - 呼び出しを記録するテスト用の偽実装を用意する
   - 完了時: 偽実装で呼び出し内容を検証するテストが書け、本番実装がビルドされる
@@ -259,3 +259,7 @@
 - 1.2: `CaptureId` は読み込み(serde)でも形式を検証する(`try_from`)。`_NN` は 02〜99 のみ受け付ける。
 - 1.3: `LibraryError` の JSON は `{ kind, id?, path?, message }` で、`message` は利用者向けの日本語文(Display)。`DeleteOutcome.failed` は design のタプルではなく `{ id, error }` の構造体にした(IPC の形は design どおり)。
 - 1.4: イベントは `LibraryEvent` 列挙と `emit` で発行する。サービスからは差し替え可能な発行関数として使う想定。
+- 2.1: DIBV5 ヘッダと画素列への変換と PNG 化は OS に依存しない `platform::image_formats` に置き、Linux でも単体テストする。`ClipboardImage` もここで定義し、`platform::windows::clipboard` から再公開する(capture-library の `DesktopOps` が Windows 以外でもビルドできるように)。ペイント / チャットアプリへの貼り付けは手動 E2E(10.3)で確認する。
+- 2.2: `reveal` は opener プラグインの `reveal_item_in_dir` 関数を直接呼ぶ(`AppHandle` 不要)。ごみ箱からの復元とエクスプローラーの選択表示は手動 E2E(10.3)で確認する。隠し属性は Windows CI の単体テストで確認する。
+- 2.3: 本番実装 `SystemDesktop` は Windows 以外ではエラーを返す(Snipt は Windows 専用。テストは偽実装 `ports::fake::RecordingDesktop` を使う)。クリップボード使用中は「ほかのアプリがクリップボードを使用中です」の clipboard エラーにする。
+- 開発メモ: Linux 上でも `cargo clippy --target x86_64-pc-windows-msvc --all-targets` で Windows 用コードの型検査ができる(リンクはしない)。
