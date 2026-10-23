@@ -3,6 +3,8 @@
 //! app-shell must not depend on downstream modules (capture_library, screen_capture,
 //! annotation_editor); downstream specs plug in through traits in `crate::shared`.
 
+pub mod hotkeys;
+
 use tauri::{App, Runtime};
 
 /// Stage 1: load settings and manage shared services before downstream setup runs.
