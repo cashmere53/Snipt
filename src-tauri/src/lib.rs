@@ -74,6 +74,12 @@ pub fn run() {
             app_shell::commands::hotkeys_suspend,
             app_shell::commands::hotkeys_resume,
             // --- capture-library ---
+            capture_library::commands::library_list,
+            capture_library::commands::library_open_in_editor,
+            capture_library::commands::library_copy,
+            capture_library::commands::library_reveal,
+            capture_library::commands::library_delete,
+            capture_library::commands::library_prune_missing,
             // --- screen-capture ---
             // --- annotation-editor ---
         ])

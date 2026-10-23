@@ -4,6 +4,7 @@
 //! call into it.
 
 pub mod atomic_fs;
+pub mod commands;
 pub mod events;
 pub mod index;
 pub mod layout;
