@@ -3,7 +3,11 @@
 //! app-shell must not depend on downstream modules (capture_library, screen_capture,
 //! annotation_editor); downstream specs plug in through traits in `crate::shared`.
 
+pub mod autostart;
+pub mod dispatch;
 pub mod hotkeys;
+pub mod lifecycle;
+pub mod notifier;
 pub mod settings;
 
 use tauri::{App, Runtime};
