@@ -49,7 +49,18 @@ impl EditorLauncher for FakeEditor {
 
     fn close_editor(&self, id: &CaptureId) {
         let library = self.library.get().and_then(Weak::upgrade).unwrap();
-        let lock_free = library.state.try_write().is_ok();
+        // Background work (thumbnails) may hold the lock for a moment; a lock held by the
+        // caller would never be released while this call blocks it.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        let lock_free = loop {
+            if library.state.try_write().is_ok() {
+                break true;
+            }
+            if std::time::Instant::now() > deadline {
+                break false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
         self.calls.lock().unwrap().push(EditorCall::Close {
             id: id.clone(),
             lock_free,

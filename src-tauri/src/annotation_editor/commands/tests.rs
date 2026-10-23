@@ -66,6 +66,7 @@ impl Fixture {
                 editor_copy,
                 editor_pick_export_path,
                 editor_write_export,
+                editor_flush_result,
             ])
             .build(mock_context(noop_assets()))
             .unwrap();
@@ -184,10 +185,12 @@ fn other_windows_cannot_call_the_commands() {
     for label in ["history", "settings", "editor-20261022_000000_01"] {
         let window = f.window(label);
         for cmd in COMMANDS {
-            let body = if cmd == "editor_pick_export_path" {
-                InvokeBody::Json(json!({ "suggestedName": "x" }))
-            } else {
-                InvokeBody::Raw(composite())
+            let body = match cmd {
+                "editor_pick_export_path" => InvokeBody::Json(json!({ "suggestedName": "x" })),
+                "editor_flush_result" => {
+                    InvokeBody::Json(json!({ "requestId": "x", "saved": true }))
+                }
+                _ => InvokeBody::Raw(composite()),
             };
             let err = f.invoke(&window, cmd, body, &[]).unwrap_err();
             assert_eq!(err["kind"], "invalidCaptureId", "{label} {cmd}: {err}");
@@ -332,5 +335,36 @@ fn a_cancelled_dialog_returns_null() {
         f.json("editor_pick_export_path", json!({ "suggestedName": "x" }))
             .unwrap(),
         Value::Null
+    );
+}
+
+#[test]
+fn the_asked_editor_answers_its_flush_request() {
+    let f = Fixture::new();
+    let state = f.app.state::<Arc<EditorState>>().inner().clone();
+    let (request, answer) = state.expect_flush(&f.item.id);
+
+    // Another editor's answer and an unknown request are ignored, without an error.
+    let other = f.window("editor-20261022_174151");
+    let args = json!({ "requestId": request, "saved": true });
+    f.invoke(&other, "editor_flush_result", InvokeBody::Json(args), &[])
+        .unwrap();
+    f.json(
+        "editor_flush_result",
+        json!({ "requestId": "made-up", "saved": true }),
+    )
+    .unwrap();
+    assert!(answer
+        .recv_timeout(std::time::Duration::from_millis(10))
+        .is_err());
+
+    f.json(
+        "editor_flush_result",
+        json!({ "requestId": request, "saved": false }),
+    )
+    .unwrap();
+    assert_eq!(
+        answer.recv_timeout(std::time::Duration::from_secs(1)),
+        Ok(false)
     );
 }

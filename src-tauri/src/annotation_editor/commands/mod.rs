@@ -236,15 +236,31 @@ pub async fn editor_write_export<R: Runtime>(
     logged("write_export", &id, result)
 }
 
-/// Command names, in the order listed in `build.rs` (`AppManifest::commands`). The flush
-/// answer (`editor_flush_result`) is added with the exit hook.
-pub const COMMANDS: [&str; 6] = [
+/// The answer to `editor://flush-request`. A late answer (after the exit hook stopped waiting)
+/// or an answer for another editor's request is ignored.
+#[tauri::command]
+pub fn editor_flush_result<R: Runtime>(
+    webview: Webview<R>,
+    request_id: String,
+    saved: bool,
+    state: State<'_, Arc<EditorState>>,
+) -> Result<(), EditorError> {
+    let id = caller(&webview)?;
+    if !state.answer_flush(&id, &request_id, saved) {
+        log::warn!("editor: {id} answered an unknown flush request");
+    }
+    Ok(())
+}
+
+/// Command names, in the order listed in `build.rs` (`AppManifest::commands`).
+pub const COMMANDS: [&str; 7] = [
     "editor_open_session",
     "editor_read_original",
     "editor_save",
     "editor_copy",
     "editor_pick_export_path",
     "editor_write_export",
+    "editor_flush_result",
 ];
 
 #[cfg(test)]
