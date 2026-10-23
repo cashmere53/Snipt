@@ -1,8 +1,19 @@
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WindowRouter } from "./WindowRouter";
 
 describe("WindowRouter", () => {
+  // Windows load their data on mount; only the history list needs an answer here.
+  beforeEach(() =>
+    mockIPC(
+      (cmd) => (cmd === "library_list" ? [] : Promise.reject(new Error(`${cmd}: not mocked`))),
+      {
+        shouldMockEvents: true,
+      },
+    ),
+  );
+
   it.each([
     ["settings", "SettingsWindow"],
     ["history", "HistoryWindow"],

@@ -1,0 +1,145 @@
+.history {
+  font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+  font-size: 13px;
+  color: #1f1f1f;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.history-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.history-count {
+  margin-left: auto;
+  color: #5f5f5f;
+}
+
+.history-error {
+  margin: 0;
+  padding: 6px 12px;
+  background: #fdecea;
+  color: #b3261e;
+}
+
+.history-empty {
+  margin: 32px auto;
+  color: #5f5f5f;
+}
+
+.history-grid {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  outline: none;
+}
+
+.history-grid-content {
+  position: relative;
+}
+
+.history-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 0;
+  padding: 0 8px;
+}
+
+.history-tile {
+  width: 200px;
+  margin: 8px 8px 0 0;
+  padding: 6px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+  cursor: default;
+  user-select: none;
+}
+
+.history-tile:hover {
+  background: #f3f3f3;
+}
+
+.history-tile[aria-selected="true"] {
+  background: #e5f1fb;
+  border-color: #0067c0;
+}
+
+.history-thumb {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-conic-gradient(#f0f0f0 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;
+}
+
+.history-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.history-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #e8e8e8;
+}
+
+.history-caption {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: #3f3f3f;
+}
+
+.history-menu {
+  position: fixed;
+  display: grid;
+  min-width: 180px;
+  padding: 4px 0;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.history-menu button {
+  text-align: left;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+}
+
+.history-menu button:hover:enabled {
+  background: #f0f0f0;
+}
+
+.history-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 25%);
+}
+
+.history-dialog {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  min-width: 320px;
+}
+
+.history-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
