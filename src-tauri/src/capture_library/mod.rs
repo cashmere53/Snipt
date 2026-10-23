@@ -7,8 +7,12 @@ pub mod atomic_fs;
 pub mod commands;
 pub mod events;
 pub mod index;
+#[cfg(test)]
+mod integration_tests;
 pub mod layout;
 pub mod naming;
+#[cfg(test)]
+mod perf_tests;
 pub mod png_meta;
 pub mod ports;
 pub mod service;
