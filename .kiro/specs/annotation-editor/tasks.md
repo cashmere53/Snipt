@@ -12,7 +12,7 @@
   - _Depends: app-shell: プロジェクト雛形, Vitest 設定_
   - _Requirements: 1.1_
 
-- [ ] 1.2 (P) 編集画面を開く・閉じるための共有トレイトを定義する
+- [x] 1.2 (P) 編集画面を開く・閉じるための共有トレイトを定義する
   - 「既存なら前面化、無ければ生成し、呼び出し元をブロックしない」開く操作と、「開いていれば未保存注釈を flush してから閉じ、閉じ終わるか 3 秒経過までブロックする(メインスレッドから呼ばない)」閉じる操作の 2 つを持つ共有トレイトを、共有モジュールに追加する
   - キャプチャ ID は capture-library の共有型をそのまま使う
   - 完了状態: 共有モジュールからトレイトを参照する空実装を含めて `cargo check` が通り、screen-capture / capture-library がこのトレイトだけに依存してコンパイルできる
@@ -326,3 +326,6 @@
   - 完了状態: 計測結果が目標内であるか、超過時は超過量を記録した計測テストが存在する
   - _Depends: 6.4_
   - _Requirements: 1.1, 10.3, 11.1_
+
+## Implementation Notes
+- 1.2: capture-library 5.7 の削除で必要になったため、`shared::EditorLauncher` トレイト(`open_editor` / `close_editor`)を design どおりに先に追加した。実装と managed state への登録は 2 以降で行う(それまで capture-library は起動口が無いものとして動く)。

@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use snipt_lib::capture_library::CaptureLibrary;
 use snipt_lib::shared::{BeforeExitHooks, Notifier, SettingsStore};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 use tauri::Manager;
@@ -27,4 +28,10 @@ fn stage_one_and_downstream_setup_succeed_on_mock_runtime() {
     assert!(app.try_state::<Arc<SettingsStore>>().is_some());
     assert!(app.try_state::<Arc<dyn Notifier>>().is_some());
     assert!(app.try_state::<Arc<BeforeExitHooks>>().is_some());
+    let library = app.state::<Arc<CaptureLibrary>>();
+    assert!(library.list().is_empty());
+    assert_eq!(
+        library.save_dir(),
+        root.path().join("Pictures").join("Snipt")
+    );
 }
