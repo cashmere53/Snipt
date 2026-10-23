@@ -56,8 +56,9 @@ pub fn run() {
                 ])
                 .level(log::LevelFilter::Info)
                 .build(),
-        );
-    // --- capture-library ---
+        )
+        // --- capture-library ---
+        .plugin(tauri_plugin_opener::init());
     // --- screen-capture ---
     // --- annotation-editor ---
 

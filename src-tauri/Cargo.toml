@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 
 # --- app-shell ---
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
@@ -26,18 +26,34 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # --- capture-library ---
+chrono = { version = "0.4", features = ["serde"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+notify = "8"
+png = "0.18"
+tauri-plugin-opener = "2"
+thiserror = "2"
+trash = "5"
 # --- screen-capture ---
 # --- annotation-editor ---
 
 [target.'cfg(windows)'.dependencies]
 # --- app-shell ---
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Registry"] }
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Registry",
+  # --- capture-library ---
+  "Win32_Graphics_Gdi",
+  "Win32_Storage_FileSystem",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+] }
 # --- capture-library ---
 # --- screen-capture ---
 # --- annotation-editor ---
 
 [dev-dependencies]
-tauri = { version = "2", features = ["tray-icon", "test"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset", "test"] }
 tempfile = "3"
 
 [profile.release]
