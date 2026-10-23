@@ -143,8 +143,8 @@ impl Serialize for LibraryError {
 #[error("{reason}")]
 pub struct SaveCaptureError {
     pub reason: LibraryError,
-    /// Kept in the unsaved store; open the editor with this id.
-    pub unsaved: CaptureItem,
+    /// Kept in the unsaved store; open the editor with this id. Boxed to keep `Result`s small.
+    pub unsaved: Box<CaptureItem>,
 }
 
 /// One capture that `delete` could not move to the recycle bin.
@@ -294,7 +294,7 @@ mod tests {
             reason: LibraryError::DiskFull {
                 message: "no space".to_owned(),
             },
-            unsaved: item("20261022_174150"),
+            unsaved: Box::new(item("20261022_174150")),
         };
         let value = serde_json::to_value(&err).unwrap();
         assert_eq!(value["reason"]["kind"], "diskFull");

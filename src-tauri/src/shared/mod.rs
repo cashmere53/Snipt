@@ -16,3 +16,6 @@ mod capture_id;
 
 pub use capture_id::{CaptureId, InvalidCaptureId};
 // --- annotation-editor ---
+mod editor_launcher;
+
+pub use editor_launcher::EditorLauncher;

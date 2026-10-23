@@ -187,7 +187,8 @@ impl LibraryIndex {
             }
         }
 
-        if report.changed() {
+        // A folder that does not exist yet gets its cache with the first save.
+        if report.changed() && layout.tmp_dir().is_dir() {
             if let Err(e) = index.persist(layout) {
                 log::warn!("library: could not write the index: {e}");
             }

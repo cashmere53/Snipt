@@ -138,7 +138,11 @@ impl Drop for ThumbnailWorker {
         lock.lock().unwrap().closed = true;
         wake.notify_all();
         if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
+            // The last owner may be dropped from inside `on_done`; the thread then ends by
+            // itself on its next turn.
+            if thread.thread().id() != std::thread::current().id() {
+                let _ = thread.join();
+            }
         }
     }
 }
