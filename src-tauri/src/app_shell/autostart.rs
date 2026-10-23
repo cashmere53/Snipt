@@ -49,7 +49,7 @@ impl AutostartSync {
         Self::with_os_changes(backend, !cfg!(debug_assertions))
     }
 
-    fn with_os_changes(backend: Box<dyn AutostartBackend>, change_os: bool) -> Self {
+    pub(crate) fn with_os_changes(backend: Box<dyn AutostartBackend>, change_os: bool) -> Self {
         Self { backend, change_os }
     }
 

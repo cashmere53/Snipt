@@ -1,7 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "app-shell",
-  "description": "Permissions for the settings window",
-  "windows": ["settings"],
-  "permissions": ["core:default"]
+  "description": "Permissions for the settings window: core defaults, the folder picker and app-shell commands. Global shortcuts and autostart stay in Rust.",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-settings-get",
+    "allow-settings-update",
+    "allow-settings-check-save-dir",
+    "allow-hotkeys-status",
+    "allow-hotkeys-retry",
+    "allow-hotkeys-suspend",
+    "allow-hotkeys-resume"
+  ]
 }

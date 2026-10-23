@@ -11,6 +11,25 @@ fn main() {
         println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
         println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
     }
-    tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
-        .expect("failed to run tauri-build");
+    // Every app command must be listed here so that capabilities can allow it per window.
+    // Each spec appends its own section.
+    let commands: &[&str] = &[
+        // --- app-shell ---
+        "settings_get",
+        "settings_update",
+        "settings_check_save_dir",
+        "hotkeys_status",
+        "hotkeys_retry",
+        "hotkeys_suspend",
+        "hotkeys_resume",
+        // --- capture-library ---
+        // --- screen-capture ---
+        // --- annotation-editor ---
+    ];
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .windows_attributes(windows)
+            .app_manifest(tauri_build::AppManifest::new().commands(commands)),
+    )
+    .expect("failed to run tauri-build");
 }

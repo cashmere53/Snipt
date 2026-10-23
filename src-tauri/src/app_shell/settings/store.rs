@@ -58,10 +58,6 @@ impl SettingsStore {
 
     /// Persists `next`, then replaces the current settings and notifies subscribers. On a
     /// persistence failure nothing changes and no subscriber is called.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "called by SettingsService in task 6.1")
-    )]
     pub(crate) fn commit(&self, next: Settings) -> Result<(), PersistError> {
         let _guard = self.commit_lock.lock().unwrap_or_else(|e| e.into_inner());
         self.file.save(&next)?;
