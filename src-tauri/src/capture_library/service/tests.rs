@@ -65,6 +65,7 @@ struct Harness {
     notices: Arc<Notices>,
     events: Arc<Mutex<Vec<LibraryEvent>>>,
     editor: Arc<FakeEditor>,
+    served: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl Harness {
@@ -76,6 +77,7 @@ impl Harness {
         let notices = Arc::new(Notices::default());
         let events = Arc::new(Mutex::new(Vec::new()));
         let editor = Arc::new(FakeEditor::default());
+        let served = Arc::new(Mutex::new(Vec::new()));
         let library = CaptureLibrary::open(LibraryDeps {
             save_dir: root.clone(),
             desktop: Box::new(desktop.clone()),
@@ -88,6 +90,10 @@ impl Harness {
                 let editor = editor.clone();
                 move || Some(editor.clone() as Arc<dyn EditorLauncher>)
             }),
+            serve_thumbnails: Box::new({
+                let served = served.clone();
+                move |dir| served.lock().unwrap().push(dir.to_owned())
+            }),
         });
         editor.library.set(Arc::downgrade(&library)).unwrap();
         Self {
@@ -98,6 +104,7 @@ impl Harness {
             notices,
             events,
             editor,
+            served,
         }
     }
 
@@ -186,6 +193,7 @@ fn lists_an_existing_folder_newest_first() {
         notifier: Arc::new(Notices::default()),
         events: Box::new(|_| {}),
         editor: Box::new(|| None),
+        serve_thumbnails: Box::new(|_| {}),
     });
 
     assert_eq!(
@@ -682,4 +690,121 @@ fn before_exit_saves_what_it_can_and_reports_the_rest() {
             .count(),
         1
     );
+}
+
+// --- 6.1 ---
+
+#[test]
+fn removing_files_outside_snipt_updates_the_history() {
+    let h = Harness::new();
+    let kept = h.save(50);
+    let removed = h.save(51);
+    let annotated = h
+        .library
+        .save_annotations(&kept.id, document(), flattened([0; 4]))
+        .unwrap();
+
+    fs::remove_file(&removed.original_path).unwrap();
+    fs::remove_file(annotated.annotated_path.as_ref().unwrap()).unwrap();
+
+    h.wait_for_event(|e| {
+        *e == LibraryEvent::ItemsRemoved {
+            ids: vec![removed.id.clone()],
+            reason: RemovedReason::MissingOnDisk,
+        }
+    });
+    h.wait_for_event(|e| {
+        matches!(e, LibraryEvent::ItemUpdated(item)
+            if item.id == kept.id && item.annotated_path.is_none())
+    });
+    let items = h.library.list();
+    assert_eq!(ids(&items), [kept.id.as_str()]);
+    assert_eq!(items[0].annotated_path, None);
+    assert!(
+        items[0].has_annotations,
+        "the annotation document is still there"
+    );
+}
+
+#[test]
+fn deleting_through_snipt_is_not_reported_twice() {
+    let h = Harness::new();
+    let item = h.save(50);
+    h.library.delete(std::slice::from_ref(&item.id)).unwrap();
+    // The fake recycle bin leaves the file; remove it as the real one would.
+    fs::remove_file(&item.original_path).unwrap();
+    std::thread::sleep(crate::capture_library::watcher::DEBOUNCE * 3);
+
+    let removals = h
+        .events()
+        .into_iter()
+        .filter(|e| matches!(e, LibraryEvent::ItemsRemoved { .. }))
+        .count();
+    assert_eq!(removals, 1);
+}
+
+// --- 6.2 ---
+
+#[test]
+fn switching_the_save_folder_shows_and_fills_the_new_one() {
+    let h = Harness::new();
+    let old = h.save(50);
+    let new_root = h._dir.path().join("Elsewhere");
+
+    h.library.switch_save_dir(new_root.clone());
+
+    assert!(h.library.list().is_empty());
+    assert_eq!(h.library.save_dir(), new_root);
+    assert!(h.events().contains(&LibraryEvent::Reloaded {
+        save_dir: new_root.clone(),
+    }));
+    assert_eq!(
+        h.served.lock().unwrap().clone(),
+        [
+            h.layout().thumbs_dir(),
+            LibraryLayout::new(new_root.clone()).thumbs_dir()
+        ]
+    );
+
+    let saved = h.save(51);
+    assert_eq!(
+        saved.original_path,
+        new_root.join("Snipt_20261022_174151.png")
+    );
+    assert!(
+        old.original_path.is_file(),
+        "existing files stay where they are"
+    );
+    assert_eq!(ids(&h.library.list()), [saved.id.as_str()]);
+
+    h.library.switch_save_dir(h.root.clone());
+    assert_eq!(ids(&h.library.list()), [old.id.as_str()]);
+}
+
+#[test]
+fn open_editors_keep_saving_to_their_folder_after_a_switch() {
+    let h = Harness::new();
+    let item = h.save(50);
+    h.library.load_for_edit(&item.id).unwrap();
+    h.library.switch_save_dir(h._dir.path().join("Elsewhere"));
+
+    let saved = h
+        .library
+        .save_annotations(&item.id, document(), flattened([0; 4]))
+        .unwrap();
+
+    assert_eq!(saved.annotated_path, Some(h.layout().annotated(&item.id)));
+    assert!(h.layout().annotations(&item.id).is_file());
+    assert!(h.library.list().is_empty());
+}
+
+#[test]
+fn switching_to_the_same_folder_does_nothing() {
+    let h = Harness::new();
+    h.save(50);
+    h.library.switch_save_dir(h.root.clone());
+    assert!(!h
+        .events()
+        .iter()
+        .any(|e| matches!(e, LibraryEvent::Reloaded { .. })));
 }

@@ -28,6 +28,7 @@ use super::types::{
     SaveCaptureError,
 };
 use super::unsaved::{UnsavedCapture, UnsavedStore};
+use super::watcher::{FolderChanges, FolderWatcher};
 use crate::shared::{CaptureId, EditorLauncher, ExitCheck, Notice, NoticeLevel, Notifier};
 
 /// Index writes requested within this window are merged into one.
@@ -51,6 +52,8 @@ pub struct LibraryDeps {
     pub notifier: Arc<dyn Notifier>,
     pub events: EventSink,
     pub editor: EditorResolver,
+    /// Lets the history window load thumbnails from this folder (the asset protocol scope).
+    pub serve_thumbnails: Box<dyn Fn(&Path) + Send + Sync>,
 }
 
 struct LibraryState {
@@ -207,6 +210,9 @@ pub struct CaptureLibrary {
     editor: EditorResolver,
     thumbnails: ThumbnailWorker,
     persist: Arc<PersistQueue>,
+    serve_thumbnails: Box<dyn Fn(&Path) + Send + Sync>,
+    watcher: Mutex<Option<FolderWatcher>>,
+    this: Weak<CaptureLibrary>,
 }
 
 impl CaptureLibrary {
@@ -237,8 +243,12 @@ impl CaptureLibrary {
                 editor: deps.editor,
                 thumbnails: ThumbnailWorker::start(on_done),
                 persist: Arc::new(PersistQueue::default()),
+                serve_thumbnails: deps.serve_thumbnails,
+                watcher: Mutex::new(None),
+                this: weak.clone(),
             }
         });
+        (library.serve_thumbnails)(&layout.thumbs_dir());
 
         let queue = library.persist.clone();
         let weak = Arc::downgrade(&library);
@@ -280,10 +290,116 @@ impl CaptureLibrary {
                 .collect()
         };
         self.ready.open();
-        for item in missing {
+        self.watch(layout);
+        self.request_missing_thumbnails(layout, missing);
+    }
+
+    fn request_missing_thumbnails(&self, layout: &LibraryLayout, items: Vec<CaptureItem>) {
+        for item in items {
             let source = ThumbnailSource::File(item.display_path().to_owned());
             self.request_thumbnail(&item, layout, source);
         }
+    }
+
+    /// Watches `layout`'s folder unless it is already watched or does not exist yet (the first
+    /// save calls this again).
+    fn watch(&self, layout: &LibraryLayout) {
+        let mut watcher = self.watcher.lock().unwrap_or_else(|e| e.into_inner());
+        if watcher.as_ref().is_some_and(|w| w.root() == layout.root()) || !layout.root().is_dir() {
+            return;
+        }
+        let this = self.this.clone();
+        let started = FolderWatcher::start(
+            layout.root(),
+            Box::new(move |root, changes| {
+                if let Some(library) = this.upgrade() {
+                    library.on_folder_changes(root, &changes);
+                }
+            }),
+        );
+        match started {
+            Ok(started) => *watcher = Some(started),
+            Err(e) => log::warn!("library: cannot watch {}: {e}", layout.root().display()),
+        }
+    }
+
+    /// Files removed or renamed outside Snipt: missing originals leave the history, a missing
+    /// annotated PNG falls back to the original.
+    fn on_folder_changes(&self, root: &Path, changes: &FolderChanges) {
+        if self.read().layout.root() != root {
+            return;
+        }
+        let originals: Vec<CaptureId> = changes.originals.iter().cloned().collect();
+        self.prune_missing(&originals);
+
+        let updated: Vec<CaptureItem> = {
+            let mut state = self.write();
+            let gone: Vec<CaptureItem> = changes
+                .annotated
+                .iter()
+                .filter_map(|id| state.index.get(id))
+                .filter(|item| item.annotated_path.as_ref().is_some_and(|p| !p.exists()))
+                .cloned()
+                .collect();
+            gone.into_iter()
+                .map(|mut item| {
+                    item.annotated_path = None;
+                    state.index.upsert(item.clone());
+                    if let Some(session) = state.sessions.get_mut(&item.id) {
+                        session.annotated_path = None;
+                    }
+                    item
+                })
+                .collect()
+        };
+        if updated.is_empty() {
+            return;
+        }
+        let layout = self.read().layout.clone();
+        self.schedule_persist();
+        for item in updated {
+            log::info!("library: annotated PNG of {} is gone", item.id);
+            self.emit(LibraryEvent::ItemUpdated(item.clone()));
+            let source = ThumbnailSource::File(item.original_path.clone());
+            self.request_thumbnail(&item, &layout, source);
+        }
+    }
+
+    /// Switches to another save folder: its history is loaded and shown, and later captures
+    /// are saved there. Files are not moved. Saves wait until the switch is done. Editors that
+    /// are open keep saving to the folder their capture came from.
+    pub fn switch_save_dir(&self, save_dir: PathBuf) {
+        let layout = LibraryLayout::new(save_dir);
+        let missing = {
+            let mut state = self.write();
+            if state.layout == layout {
+                return;
+            }
+            self.watcher
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .take();
+            let (index, _) = LibraryIndex::load(&layout);
+            log::info!(
+                "library: switched from {} to {}",
+                state.layout.root().display(),
+                layout.root().display()
+            );
+            state.layout = layout.clone();
+            state.index = index;
+            state
+                .index
+                .items_newest_first()
+                .into_iter()
+                .filter(|item| item.thumbnail_path.is_none())
+                .collect()
+        };
+        (self.serve_thumbnails)(&layout.thumbs_dir());
+        self.watch(&layout);
+        self.emit(LibraryEvent::Reloaded {
+            save_dir: layout.root().to_owned(),
+        });
+        self.request_missing_thumbnails(&layout, missing);
     }
 
     fn read(&self) -> RwLockReadGuard<'_, LibraryState> {
@@ -458,6 +574,7 @@ impl CaptureLibrary {
                 let item = item(id, width, height, &layout);
                 state.index.upsert(item.clone());
                 drop(state);
+                self.watch(&layout);
                 self.schedule_persist();
                 self.emit(LibraryEvent::ItemAdded(item.clone()));
                 let source = match image {
