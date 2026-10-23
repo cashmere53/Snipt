@@ -1,0 +1,178 @@
+.editor {
+  font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+  font-size: 13px;
+  color: #1f1f1f;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.editor button {
+  font: inherit;
+}
+
+.editor-toolbar,
+.editor-style,
+.editor-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+}
+
+.editor-toolbar {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.editor-style {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.editor-status {
+  justify-content: space-between;
+  border-top: 1px solid #e0e0e0;
+}
+
+.editor-tool-group {
+  display: flex;
+  gap: 2px;
+}
+
+.editor-tool-group-end {
+  margin-left: auto;
+}
+
+.editor-toolbar button[aria-pressed="true"],
+.editor-segmented button[aria-checked="true"] {
+  background: #d3e3fd;
+  border-color: #1e88e5;
+}
+
+.editor-palette {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #9e9e9e;
+  border-radius: 50%;
+}
+
+.editor-swatch[aria-checked="true"] {
+  outline: 2px solid #1e88e5;
+  outline-offset: 2px;
+}
+
+.editor-style label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.editor-segmented {
+  display: flex;
+}
+
+.editor-zoom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.editor-zoom span {
+  min-width: 48px;
+  text-align: center;
+}
+
+.editor-save {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #5f5f5f;
+}
+
+.editor-save-failed {
+  color: #b3261e;
+}
+
+.editor-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #e8e8e8;
+}
+
+.editor-text-input {
+  position: absolute;
+  margin: 0;
+  border: 1px dashed #1e88e5;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  field-sizing: content;
+  box-sizing: content-box;
+}
+
+.editor-notices {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+.editor-notice-warning {
+  background: #fff4e5;
+  color: #8a4b00;
+}
+
+.editor-notice-error {
+  background: #fdecea;
+  color: #b3261e;
+}
+
+.editor-notice button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.editor-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 30%);
+}
+
+.editor-dialog {
+  max-width: 420px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+}
+
+.editor-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.editor-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
