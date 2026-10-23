@@ -10,14 +10,18 @@ use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
 use super::autostart::{AutostartSync, PluginAutostart};
 use super::dispatch::CaptureDispatch;
+use super::hotkeys::manager::ReservationProbe;
 use super::hotkeys::{
     accelerator, GlobalShortcutBackend, HotkeyFailureKind, HotkeyManager, HotkeyStatus,
+    ShortcutBackend,
 };
-use super::lifecycle::{AppExitActions, BeforeExitHooks, DialogExitConfirm, Lifecycle};
+use super::lifecycle::{
+    AppExitActions, BeforeExitHooks, DialogExitConfirm, ExitActions, ExitConfirm, Lifecycle,
+};
 use super::notifier::ToastNotifier;
 use super::service::{SettingsService, SETTINGS_CHANGED_EVENT};
 use super::settings::{LoadOutcome, SettingsStore};
-use super::tray::{self, AppTrayTargets};
+use super::tray::{self, AppTray, AppTrayTargets, TrayHost};
 use super::windows::WindowManager;
 use crate::shared::{CaptureMode, Notice, NoticeLevel, Notifier};
 
@@ -26,38 +30,72 @@ const NOTICE_TITLE: &str = "Snipt";
 /// How the settings were loaded, handed from stage 1 to stage 2.
 struct PendingLoadOutcome(Mutex<Option<LoadOutcome>>);
 
+/// The OS-facing parts of app-shell. Production uses `Platform::production`; tests pass fakes.
+pub struct Platform {
+    pub shortcuts: Box<dyn ShortcutBackend>,
+    pub reservation: ReservationProbe,
+    pub autostart: AutostartSync,
+    pub notifier: Arc<dyn Notifier>,
+    pub exit_confirm: Box<dyn ExitConfirm>,
+    /// Builds the final exit steps once the `HotkeyManager` exists.
+    pub exit_actions: Box<dyn FnOnce(Arc<HotkeyManager>) -> Box<dyn ExitActions>>,
+    pub tray: Arc<dyn TrayHost>,
+}
+
+impl Platform {
+    pub fn production<R: Runtime>(app: &AppHandle<R>) -> Self {
+        let exit_app = app.clone();
+        Self {
+            shortcuts: Box::new(GlobalShortcutBackend::new(app.clone())),
+            reservation: HotkeyManager::windows_probe(),
+            autostart: AutostartSync::new(Box::new(PluginAutostart::new(app.clone()))),
+            notifier: Arc::new(ToastNotifier::new(app.clone())),
+            exit_confirm: Box::new(DialogExitConfirm::new(app.clone())),
+            exit_actions: Box::new(move |hotkeys| {
+                Box::new(AppExitActions::new(exit_app, hotkeys)) as Box<dyn ExitActions>
+            }),
+            tray: Arc::new(AppTray::new(app.clone())),
+        }
+    }
+}
+
 pub fn setup<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("setup: app-shell (stage 1)");
     let settings_path = app.path().app_config_dir()?.join("settings.json");
     let picture_dir = app.path().picture_dir()?;
-    setup_at(app.handle(), settings_path, &picture_dir);
+    let platform = Platform::production(app.handle());
+    setup_at(app.handle(), settings_path, &picture_dir, platform);
     Ok(())
 }
 
-/// Stage 1 with explicit paths (tests use temporary ones). Manages `Arc<SettingsStore>`, `Arc<dyn Notifier>`,
-/// `Arc<BeforeExitHooks>`, `Arc<HotkeyManager>`, `Arc<Lifecycle>` and `Arc<SettingsService>`.
-/// Nothing is registered with the OS yet.
-pub fn setup_at<R: Runtime>(app: &AppHandle<R>, settings_path: PathBuf, picture_dir: &Path) {
+/// Stage 1 with explicit paths and OS parts (tests use temporary folders and fakes).
+/// Manages `Arc<SettingsStore>`, `Arc<dyn Notifier>`, `Arc<BeforeExitHooks>`,
+/// `Arc<HotkeyManager>`, `Arc<Lifecycle>`, `Arc<AutostartSync>`, `Arc<SettingsService>` and
+/// `Arc<dyn TrayHost>`, plus the load outcome for stage 2. Nothing is registered with the OS
+/// yet.
+pub fn setup_at<R: Runtime>(
+    app: &AppHandle<R>,
+    settings_path: PathBuf,
+    picture_dir: &Path,
+    platform: Platform,
+) {
     let (store, outcome) = SettingsStore::load(settings_path, picture_dir);
     log::info!("settings: {outcome:?}");
     let store = Arc::new(store);
 
-    let notifier: Arc<dyn Notifier> = Arc::new(ToastNotifier::new(app.clone()));
     let hooks = Arc::new(BeforeExitHooks::default());
     let hotkeys = Arc::new(HotkeyManager::new(
-        Box::new(GlobalShortcutBackend::new(app.clone())),
-        HotkeyManager::windows_probe(),
+        platform.shortcuts,
+        platform.reservation,
         store.get().hotkeys.clone(),
     ));
     let lifecycle = Arc::new(Lifecycle::new(
         hooks.clone(),
-        Box::new(DialogExitConfirm::new(app.clone())),
-        Box::new(AppExitActions::new(app.clone(), hotkeys.clone())),
-        notifier.clone(),
+        platform.exit_confirm,
+        (platform.exit_actions)(hotkeys.clone()),
+        platform.notifier.clone(),
     ));
-    let autostart = Arc::new(AutostartSync::new(Box::new(PluginAutostart::new(
-        app.clone(),
-    ))));
+    let autostart = Arc::new(platform.autostart);
     let emitter = app.clone();
     let service = Arc::new(SettingsService::new(
         store.clone(),
@@ -71,21 +109,26 @@ pub fn setup_at<R: Runtime>(app: &AppHandle<R>, settings_path: PathBuf, picture_
     ));
 
     app.manage(store);
-    app.manage(notifier);
+    app.manage(platform.notifier);
     app.manage(hooks);
     app.manage(hotkeys);
     app.manage(lifecycle);
     app.manage(autostart);
     app.manage(service);
+    app.manage(platform.tray);
     app.manage(PendingLoadOutcome(Mutex::new(Some(outcome))));
 }
 
 pub fn start<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("setup: app-shell (stage 2)");
-    let app = app.handle();
+    start_handle(app.handle())
+}
+
+fn start_handle<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
     let store = app.state::<Arc<SettingsStore>>().inner().clone();
     let hotkeys = app.state::<Arc<HotkeyManager>>().inner().clone();
     let notifier = app.state::<Arc<dyn Notifier>>().inner().clone();
+    let tray_host = app.state::<Arc<dyn TrayHost>>().inner().clone();
     let settings = store.get();
 
     let statuses = hotkeys.register_initial(&settings.hotkeys);
@@ -94,7 +137,7 @@ pub fn start<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Err
         windows: WindowManager::new(app.clone()),
         lifecycle: app.state::<Arc<Lifecycle>>().inner().clone(),
     });
-    tray::create(app, targets, &tray::tooltip_text(&settings, &statuses))?;
+    tray_host.create(targets, &tray::tooltip_text(&settings, &statuses))?;
     let tooltip_app = app.clone();
     store.subscribe(Box::new(move |_| tray::refresh_from_state(&tooltip_app)));
 
@@ -307,6 +350,7 @@ mod tests {
             app.handle(),
             root.path().join("config").join("settings.json"),
             &root.path().join("Pictures"),
+            Platform::production(app.handle()),
         );
 
         let store = app.state::<Arc<SettingsStore>>();

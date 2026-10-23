@@ -256,14 +256,14 @@
   - _Depends: 6.2, 7.2_
   - _Requirements: 3.8, 7.1, 7.2_
 
-- [ ] 10. 検証
-- [ ] 10.1 起動・確定・終了の結合テストを追加する
+- [x] 10. 検証
+- [x] 10.1 起動・確定・終了の結合テストを追加する
   - Tauri のモックランタイムとフェイク(ショートカット、自動起動、通知、確認表示)で、2 段階 setup が CaptureRequester 未登録でも成功し、壊れた設定ファイルからの起動で初期化通知が 1 件出ることを確認する
   - 設定確定から設定変更イベント送信・購読者呼び出しまでと、終了時のフック実行 → ホットキー全解放の順序を確認する
   - 完了状態: `cargo test` でこれらの結合テストが CI(windows-latest)上で成功する
   - _Requirements: 3.8, 4.3, 7.1, 7.3_
 
-- [ ]* 10.2 ホットキー押下からキャプチャ要求までの遅延を計測するテストを追加する
+- [x]* 10.2 ホットキー押下からキャプチャ要求までの遅延を計測するテストを追加する
   - フェイクの CaptureRequester を使い、押下の解決から request_capture 呼び出しまでが 10ms 未満であることを確認する(2.2 の即時性の補助確認)
   - 完了状態: 計測テストが `cargo test` で成功する
   - _Requirements: 2.2_
@@ -297,3 +297,5 @@
 - 9.1: 第 1 段の本体は `app_shell::startup::setup_at(app, 設定ファイルのパス, ピクチャフォルダ)` で、テストは一時フォルダを渡して管理状態を確認する。読み込み結果(`LoadOutcome`)は第 2 段の通知のため管理状態に預ける。`AutostartSync` と `SettingsService` も第 1 段で管理状態に置く(OS への登録は第 2 段)。
 - 9.2: ホットキー押下の処理(`app_shell::on_shortcut`)は `ShortcutState::Pressed` のときだけ種別を解決する。起動時の通知は「設定の初期化」「ホットキー登録失敗(失敗したものを 1 件にまとめ、競合と Windows 予約の案内を該当するものだけ付ける)」「自動起動の同期失敗」の順に出す。ツールチップは `tray::refresh_from_state` で作り直し、SettingsStore の購読(第 2 段の最後に登録するので下流の購読者より後)と `hotkeys_retry` / `hotkeys_resume` から呼ぶ。
 - 9.3: `RunEvent::ExitRequested` は `lib.rs` の `on_run_event`(spec 別区画)で `Lifecycle::should_prevent_exit` により判定する。第 2 段はトレイと OS のホットキーを使うためモックランタイムでは動かせない。`tests/setup.rs` は第 1 段と下流 setup(`snipt_lib::setup_downstream`)までを確認し、第 2 段は開発実行と 10.x で確認する。
+- 10.1: OS に触れる部分(ショートカット、予約判定、自動起動、通知、終了確認、終了手順、トレイ)を `startup::Platform` にまとめて第 1 段に渡す形にし、本番は `Platform::production`、テストはフェイクを渡す。トレイは `tray::TrayHost` トレイト(本番は `AppTray`)で、ツールチップの更新もこれを通す。フェイクの `FakeBackend` などは `#[cfg(test)]` のままにするため、結合テストは `tests/` ではなくクレート内の `app_shell::integration_tests` に置いた。
+- 10.2: 押下の解決から `request_capture` までをフェイクの CaptureRequester で計測し、10ms 未満を確認する(同じ結合テストのファイル内)。離したとき(Released)は要求しないことも確認する。

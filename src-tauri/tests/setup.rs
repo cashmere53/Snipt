@@ -20,6 +20,7 @@ fn stage_one_and_downstream_setup_succeed_on_mock_runtime() {
         app.handle(),
         root.path().join("settings.json"),
         &root.path().join("Pictures"),
+        snipt_lib::app_shell::startup::Platform::production(app.handle()),
     );
     snipt_lib::setup_downstream(&mut app).expect("downstream setup failed");
 
