@@ -27,6 +27,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # --- capture-library ---
 chrono = { version = "0.4", features = ["serde"] }
+crc32fast = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 notify = "8"
 png = "0.18"
