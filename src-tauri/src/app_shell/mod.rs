@@ -11,6 +11,8 @@ pub mod lifecycle;
 pub mod notifier;
 pub mod service;
 pub mod settings;
+pub mod tray;
+pub mod windows;
 
 use tauri::{App, Runtime};
 
