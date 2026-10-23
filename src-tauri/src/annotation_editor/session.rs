@@ -26,6 +26,8 @@ struct WindowSession {
 #[derive(Default)]
 pub struct EditorState {
     sessions: Mutex<HashMap<CaptureId, WindowSession>>,
+    /// Flush requests sent on quit, by request id: the editor asked and where to answer.
+    flushes: Mutex<HashMap<String, (CaptureId, Sender<bool>)>>,
 }
 
 impl EditorState {
@@ -58,6 +60,38 @@ impl EditorState {
         let (tx, rx) = mpsc::channel();
         self.with(id, |session| session.close_waiters.push(tx));
         rx
+    }
+
+    /// Registers a flush request to `id`'s editor; the receiver gets its answer.
+    pub fn expect_flush(&self, id: &CaptureId) -> (String, Receiver<bool>) {
+        let request_id = uuid::Uuid::new_v4().to_string();
+        let (tx, rx) = mpsc::channel();
+        self.flushes
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(request_id.clone(), (id.clone(), tx));
+        (request_id, rx)
+    }
+
+    /// Delivers an editor's answer; only the editor that was asked can answer. Returns whether
+    /// the request was known.
+    pub fn answer_flush(&self, id: &CaptureId, request_id: &str, saved: bool) -> bool {
+        let mut flushes = self.flushes.lock().unwrap_or_else(|e| e.into_inner());
+        match flushes.get(request_id) {
+            Some((asked, _)) if asked == id => {
+                let (_, answer) = flushes.remove(request_id).expect("just found");
+                let _ = answer.send(saved);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn forget_flushes(&self, request_ids: &[String]) {
+        let mut flushes = self.flushes.lock().unwrap_or_else(|e| e.into_inner());
+        for request_id in request_ids {
+            flushes.remove(request_id);
+        }
     }
 
     /// Forgets the editor and wakes its close waiters.
@@ -129,5 +163,30 @@ mod tests {
             Err(EditorError::UnknownToken)
         );
         state.remove(&a);
+    }
+
+    #[test]
+    fn only_the_asked_editor_answers_a_flush() {
+        let state = EditorState::default();
+        let a = id("20261022_174150");
+        let b = id("20261022_174151");
+        let (request, answer) = state.expect_flush(&a);
+
+        assert!(!state.answer_flush(&b, &request, true));
+        assert!(!state.answer_flush(&a, "made-up", true));
+        assert!(answer.recv_timeout(Duration::from_millis(10)).is_err());
+
+        assert!(state.answer_flush(&a, &request, false));
+        assert_eq!(answer.recv_timeout(Duration::from_secs(1)), Ok(false));
+        assert!(!state.answer_flush(&a, &request, true), "answered once");
+    }
+
+    #[test]
+    fn forgotten_flushes_cannot_be_answered() {
+        let state = EditorState::default();
+        let a = id("20261022_174150");
+        let (request, _answer) = state.expect_flush(&a);
+        state.forget_flushes(std::slice::from_ref(&request));
+        assert!(!state.answer_flush(&a, &request, true));
     }
 }
