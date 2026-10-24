@@ -5,7 +5,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { AnnotationDocument, Point, Rect, Shape, ShapeId, TextShape } from "../model/document";
 import { toIntegerRect } from "../model/geometry";
-import { commit, createHistory, type History, redo, undo } from "../model/history";
+import { amend, commit, createHistory, type History, redo, undo } from "../model/history";
 import { commitText, deleteShapes, setCrop } from "../model/operations";
 import type { StyleSettings } from "../model/style";
 import {
@@ -53,10 +53,14 @@ export interface EditorState {
 }
 
 export interface EditorActions {
+  /** The crop tool starts cropping; another tool cancels it. */
   setTool(tool: ToolId): void;
   select(ids: readonly ShapeId[]): void;
-  /** Records `next` as one undo step; the same document records nothing. */
-  commitDoc(next: AnnotationDocument): void;
+  /**
+   * Records `next` as one undo step; the same document records nothing. Commits with the
+   * same `gesture` (the event that ended it) right after one another make a single step.
+   */
+  commitDoc(next: AnnotationDocument, gesture?: object): void;
   /** Becomes the style of new shapes, and is applied to the selection as one undo step. */
   applyStyle(patch: Partial<StyleSettings>): void;
   deleteSelected(): void;
@@ -137,6 +141,7 @@ export function createEditorStore(options: EditorStoreOptions): StoreApi<EditorS
     /** Moves the history and everything that depends on the present document. */
     function moveHistory(history: History): void {
       const state = get();
+      lastGesture = undefined;
       if (history === state.history) return;
       const ids = new Set(history.present.shapes.map((shape) => shape.id));
       const next: EditorState = {
@@ -149,7 +154,17 @@ export function createEditorStore(options: EditorStoreOptions): StoreApi<EditorS
       set({ ...next, ...refit(next) });
     }
 
-    const commitDoc = (doc: AnnotationDocument) => moveHistory(commit(get().history, doc));
+    /** The gesture of the last commit, while it is the last change of the history. */
+    let lastGesture: object | undefined;
+
+    const commitDoc = (doc: AnnotationDocument, gesture?: object) => {
+      const { history } = get();
+      const sameGesture = gesture !== undefined && gesture === lastGesture;
+      const next = sameGesture ? amend(history, doc) : commit(history, doc);
+      moveHistory(next);
+      // A gesture whose first commit changed nothing has made no step to amend.
+      if (sameGesture || next !== history) lastGesture = gesture;
+    };
 
     const setZoom = (zoom: number, anchor?: Point) => {
       const { view, viewport, devicePixelRatio } = get();
@@ -177,6 +192,7 @@ export function createEditorStore(options: EditorStoreOptions): StoreApi<EditorS
       setTool: (tool) => {
         if (tool !== "crop" && get().cropDraft !== null) get().cancelCrop();
         set({ tool, selection: tool === "select" ? get().selection : [] });
+        if (tool === "crop" && get().cropDraft === null) get().beginCrop();
       },
 
       select: (ids) => set({ selection: [...ids] }),

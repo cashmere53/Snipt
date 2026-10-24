@@ -33,6 +33,25 @@ describe("editor store: documents", () => {
     expect(store.getState().saveStatus).toEqual({ kind: "dirty" });
   });
 
+  it("makes one step of the commits of one gesture", () => {
+    const store = storeWith([arrow("a"), rect("r")]);
+    const doc = currentDoc(store.getState());
+    const gesture = {};
+    // A first commit that changes nothing makes no step to amend.
+    store.getState().commitDoc(doc, gesture);
+    store.getState().commitDoc({ ...doc, shapes: [arrow("a")] }, gesture);
+    store.getState().commitDoc({ ...doc, shapes: [] }, gesture);
+    expect(store.getState().history.past).toEqual([doc]);
+    expect(shapes(store)).toEqual([]);
+
+    // Another gesture, an undo, or a commit without one starts a new step.
+    store.getState().commitDoc(doc, {});
+    expect(store.getState().history.past).toHaveLength(2);
+    store.getState().undo();
+    store.getState().commitDoc({ ...doc, shapes: [rect("r")] }, gesture);
+    expect(store.getState().history.past).toHaveLength(2);
+  });
+
   it("applies a style change to the selection as one step, undone back to the old color", () => {
     const store = storeWith([arrow("a"), rect("r"), text("t")]);
     store.getState().select(["a", "t"]);

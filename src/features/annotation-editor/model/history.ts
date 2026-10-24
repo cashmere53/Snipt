@@ -23,6 +23,11 @@ export function commit(history: History, next: AnnotationDocument): History {
   return { past: past.slice(-HISTORY_LIMIT), present: next, future: [] };
 }
 
+/** Replaces the present document without a new step: the rest of the step that made it. */
+export function amend(history: History, next: AnnotationDocument): History {
+  return next === history.present ? history : { ...history, present: next };
+}
+
 export function undo(history: History): History {
   const previous = history.past.at(-1);
   if (previous === undefined) {
