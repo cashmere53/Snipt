@@ -176,3 +176,14 @@
   gap: 8px;
   margin-top: 16px;
 }
+
+.editor-load-failed {
+  padding: 24px;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.editor-load-failed h1 {
+  font-size: 16px;
+  margin: 0;
+}

@@ -82,6 +82,13 @@ pub fn run() {
             capture_library::commands::library_prune_missing,
             // --- screen-capture ---
             // --- annotation-editor ---
+            annotation_editor::commands::editor_open_session,
+            annotation_editor::commands::editor_read_original,
+            annotation_editor::commands::editor_save,
+            annotation_editor::commands::editor_copy,
+            annotation_editor::commands::editor_pick_export_path,
+            annotation_editor::commands::editor_write_export,
+            annotation_editor::commands::editor_flush_result,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Snipt")

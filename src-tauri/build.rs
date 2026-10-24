@@ -31,6 +31,13 @@ fn main() {
         "library_prune_missing",
         // --- screen-capture ---
         // --- annotation-editor ---
+        "editor_open_session",
+        "editor_read_original",
+        "editor_save",
+        "editor_copy",
+        "editor_pick_export_path",
+        "editor_write_export",
+        "editor_flush_result",
     ];
     tauri_build::try_build(
         tauri_build::Attributes::new()
