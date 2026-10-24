@@ -641,6 +641,22 @@ fn a_failed_fullscreen_freeze_is_reported() {
 // --- 4.6 ---
 
 #[test]
+fn overlays_are_built_ahead_of_the_first_capture() {
+    let f = Fixture::new();
+    f.coordinator.prebuild_overlays();
+    assert_eq!(f.take_calls(), ["topology", "ensure_built 2"]);
+    f.coordinator.request_capture(CaptureMode::Region);
+    assert_eq!(
+        f.take_calls(),
+        [
+            "topology",
+            "grab_monitors",
+            "show_region 1 frames 2 focus 1"
+        ]
+    );
+}
+
+#[test]
 fn a_layout_change_while_selecting_cancels_silently_then_rebuilds() {
     let f = Fixture::new();
     f.coordinator.request_capture(CaptureMode::Region);

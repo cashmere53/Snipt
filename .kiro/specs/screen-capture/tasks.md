@@ -264,8 +264,8 @@
   - _Depends: 7.2_
   - _Requirements: 2.1, 2.2, 4.4_
 
-- [ ] 8. 結合と配線
-- [ ] 8.1 screen-capture の setup と composition root への組み込み
+- [x] 8. 結合と配線
+- [x] 8.1 screen-capture の setup と composition root への組み込み
   - setup で、プラットフォームアダプタ・オーバーレイ管理・撮影後フロー(managed state の CaptureLibrary、EditorLauncher、Notifier を取得)を組み立て、状態機械を撮影要求トレイトとして managed state に置く
   - オーバーレイを事前生成し、構成変化監視を起動して状態機械へつなぐ。起動時に DPI 認識・OS ビルド・枠なし撮影の可否をログに出す
   - composition root の screen-capture 区画で、スタブだった setup 呼び出し(annotation-editor の後)を本実装に置き換え、オーバーレイ用コマンドを登録する
@@ -277,7 +277,7 @@
   - _Depends: annotation-editor: EditorLauncher(managed state)_
   - _Requirements: 1.1, 2.1, 3.1, 4.3, 5.1, 5.2, 5.3_
 
-- [ ] 8.2 3 方式の結合テスト(フェイクの OS 層と隣接サービス)
+- [x] 8.2 3 方式の結合テスト(フェイクの OS 層と隣接サービス)
   - 実際の状態機械と撮影後フローを、フェイクの OS 撮影ポート・画面表示ポート・偽の保存先・偽の EditorLauncher・偽の Notifier と組み合わせて、範囲・ウィンドウ・全画面の各経路を端から端まで流す
   - 確認項目: 範囲確定でコピー → 保存 → 編集の順に呼ばれる、取消では何も呼ばれない、撮影中の追加要求が無視される、全画面ではオーバーレイが出ない、ウィンドウ撮影失敗では通知のみ
   - 完了時: CI(windows-latest、実画面なし)でこの結合テストが通る
@@ -333,3 +333,5 @@
 - 7.3: ドラッグ開始点は ref に持つ(同じ描画フレーム内の連続イベントでも最新を見るため)。1px 未満のドラッグは送らずに選択をやり直す。
 - 7.4: 拡大鏡は半径 8(17 × 17 px)を 8 倍で描き、ポインタの画素を枠で示す。描画フレーム単位の間引きは `nextFrame` 1 回につき最新の点で 1 回だけ要求する。
 - 7.5: ウィンドウモードの面は完全な透明ではなく `rgb(0 0 0 / 0.4%)` で塗る(透明部分のクリック透過を避けるため。1.2 の実機確認で要否を判断)。
+- 8.1: `screen_capture::setup(app)` は本番ポートを作って `setup_with(app, SetupPorts { platform, native, worker })` に渡し、構成変化監視を起動してからオーバーレイの事前生成(`CaptureCoordinator::prebuild_overlays`)をワーカーで行う(メインスレッドで同期に構築しないため)。構成変化監視の非表示ウィンドウは setup(メインスレッド)で作る。DPI 認識・OS ビルド・枠なし撮影の可否はワーカーの最初のジョブでログに出す。非 Windows とテストでは何もしない `unsupported` ポートを使う(テストが実際の OS API に触れないため)。実機での `pnpm tauri dev` 確認は 9.1 と合わせて行う(未実施)。
+- 8.2: `screen_capture::integration_tests` で、実際の状態機械と `PostCaptureFlow` をフェイクの OS ポート・保存先・EditorLauncher・Notifier と組み合わせて流す。`setup_downstream` が撮影要求・状態機械・`OverlayReadiness` を managed state に置くことも確かめる。

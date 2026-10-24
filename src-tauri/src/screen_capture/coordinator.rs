@@ -382,6 +382,22 @@ impl CaptureCoordinator {
         self.after_idle();
     }
 
+    /// Builds the overlays on the worker now (at startup), so that the first capture finds
+    /// them ready.
+    pub fn prebuild_overlays(&self) {
+        let generation = {
+            let mut shared = self.shared();
+            shared.rebuild_pending = true;
+            shared.generation
+        };
+        let this = self.clone();
+        self.inner.ports.worker.run(Box::new(move || {
+            if panic::catch_unwind(AssertUnwindSafe(|| this.rebuild(generation))).is_err() {
+                log::error!("capture: building the overlays panicked");
+            }
+        }));
+    }
+
     fn shared(&self) -> MutexGuard<'_, Shared> {
         self.inner
             .shared
