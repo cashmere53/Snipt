@@ -81,6 +81,13 @@ pub fn run() {
             capture_library::commands::library_delete,
             capture_library::commands::library_prune_missing,
             // --- screen-capture ---
+            screen_capture::commands::capture_overlay_ready,
+            screen_capture::commands::capture_overlay_shown,
+            screen_capture::commands::capture_overlay_magnifier,
+            screen_capture::commands::capture_overlay_pointer,
+            screen_capture::commands::capture_overlay_commit_region,
+            screen_capture::commands::capture_overlay_commit_window,
+            screen_capture::commands::capture_overlay_cancel,
             // --- annotation-editor ---
             annotation_editor::commands::editor_open_session,
             annotation_editor::commands::editor_read_original,
