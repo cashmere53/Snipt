@@ -11,7 +11,7 @@ export type Unlisten = () => void;
 export interface WindowPort {
   /** The user closes the window; without `preventDefault` it is destroyed. */
   onCloseRequested(handler: (event: { preventDefault(): void }) => void): Promise<Unlisten>;
-  /** Rust closes the window (the capture is deleted, or the app quits). */
+  /** Rust closes the window from outside (its capture is deleted); save, then close anyway. */
   onCloseRequest(handler: () => void): Promise<Unlisten>;
   /** The app is about to quit: save, keep the window, answer with `editor_flush_result`. */
   onFlushRequest(handler: (payload: FlushRequestPayload) => void): Promise<Unlisten>;
