@@ -76,8 +76,9 @@ export function SelectionHandles({ scale }: { scale: number }) {
     node.getLayer()?.batchDraw();
   });
 
-  // Rectangles fold the scale into their size; mosaics settle themselves (`MosaicNode`).
-  const onTransformEnd = () => {
+  // Rectangles fold the scale into their size; mosaics settle themselves (`MosaicNode`) into
+  // the same undo step, as all commits of one gesture share its event.
+  const onTransformEnd = (gesture: object) => {
     const state = store.getState();
     let doc = currentDoc(state);
     for (const node of transformer.current?.nodes() ?? []) {
@@ -94,7 +95,7 @@ export function SelectionHandles({ scale }: { scale: number }) {
       node.scale({ x: 1, y: 1 });
       doc = updateShape<RectShape>(doc, shape.id, { rect });
     }
-    state.commitDoc(doc);
+    state.commitDoc(doc, gesture);
   };
 
   return (
@@ -109,7 +110,7 @@ export function SelectionHandles({ scale }: { scale: number }) {
         borderStroke={HANDLE_COLOR}
         anchorStroke={HANDLE_COLOR}
         anchorSize={8}
-        onTransformEnd={onTransformEnd}
+        onTransformEnd={(e) => onTransformEnd(e.evt)}
       />
       {active.map((shape) =>
         shape.kind === "arrow" ? <ArrowHandles key={shape.id} arrow={shape} scale={scale} /> : null,

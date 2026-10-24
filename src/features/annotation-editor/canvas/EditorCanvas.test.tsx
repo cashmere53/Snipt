@@ -142,6 +142,45 @@ describe("EditorCanvas", () => {
     expect(f.stage.findOne("#r")!.scaleX()).toBe(1);
   });
 
+  it("moves a selection of several shapes in one step", () => {
+    const f = renderCanvas({
+      shapes: [
+        { ...rect("r"), rect: { x: 20, y: 20, width: 100, height: 60 } },
+        { ...mosaic, rect: { x: 200, y: 100, width: 32, height: 32 } },
+      ],
+    });
+    act(() => f.state().select(["r", "m"]));
+    f.stageDrag({ x: 40, y: 20 }, { x: 70, y: 40 });
+    expect(shapes(f)).toMatchObject([
+      { rect: { x: 50, y: 40, width: 100, height: 60 } },
+      { rect: { x: 230, y: 120, width: 32, height: 32 } },
+    ]);
+    expect(f.state().history.past).toHaveLength(1);
+  });
+
+  it("resizes a rectangle and a mosaic together in one step", () => {
+    const f = renderCanvas({
+      shapes: [
+        { ...rect("r"), rect: { x: 20, y: 20, width: 100, height: 60 } },
+        { ...mosaic, rect: { x: 200, y: 100, width: 32, height: 32 } },
+      ],
+    });
+    act(() => f.state().select(["r", "m"]));
+    const transformer = f.stage.findOne<Konva.Transformer>("Transformer")!;
+    // As Konva ends a transform: the transformer, then each node, with the same event.
+    const evt = new MouseEvent("mouseup");
+    act(() => {
+      for (const node of transformer.nodes()) node.scale({ x: 2, y: 2 });
+      transformer.fire("transformend", { evt });
+      for (const node of transformer.nodes()) node.fire("transformend", { evt });
+    });
+    expect(shapes(f)).toMatchObject([
+      { rect: { x: 20, y: 20, width: 200, height: 120 } },
+      { rect: { x: 200, y: 100, width: 64, height: 64 } },
+    ]);
+    expect(f.state().history.past).toHaveLength(1);
+  });
+
   it("moves an arrow's end with its handle", () => {
     const f = renderCanvas({ shapes: [arrow("a")] });
     act(() => f.state().select(["a"]));

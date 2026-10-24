@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { AnnotationDocument } from "./document";
-import { canRedo, canUndo, commit, createHistory, HISTORY_LIMIT, redo, undo } from "./history";
+import {
+  amend,
+  canRedo,
+  canUndo,
+  commit,
+  createHistory,
+  HISTORY_LIMIT,
+  redo,
+  undo,
+} from "./history";
 import { addShape } from "./operations";
 import { arrow, blank } from "./testing";
 
@@ -58,5 +67,14 @@ describe("history", () => {
     const h = createHistory(blank());
     expect(undo(h)).toBe(h);
     expect(redo(h)).toBe(h);
+  });
+
+  it("amends the present without a new step", () => {
+    const first = commit(createHistory(blank()), addShape(blank(), arrow("a")));
+    const next = addShape(first.present, arrow("b"));
+    const amended = amend(first, next);
+    expect(amended.present).toBe(next);
+    expect(amended.past).toEqual(first.past);
+    expect(amend(first, first.present)).toBe(first);
   });
 });

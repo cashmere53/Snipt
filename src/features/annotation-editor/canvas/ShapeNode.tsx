@@ -63,7 +63,7 @@ function useInteraction(shape: Shape): Interaction {
       const doc = currentDoc(state);
       const current = doc.shapes.find((s) => s.id === shape.id);
       if (current === undefined || (delta.x === 0 && delta.y === 0)) return;
-      state.commitDoc(updateShape(doc, shape.id, moveShape(current, delta)));
+      state.commitDoc(updateShape(doc, shape.id, moveShape(current, delta)), e.evt);
     },
     onDblClick: (e) => {
       const { tool: now, beginTextEdit } = store.getState();
@@ -144,7 +144,8 @@ export const nodeBox = (node: Konva.Node): NodeBox => ({
 
 /**
  * A mosaic: the original pixels of its rectangle, pixelated. While it is dragged or resized
- * the blocks follow every frame; the result is committed once at the end.
+ * the blocks follow every frame; the result is committed once at the end, into the same undo
+ * step as the other shapes of the gesture.
  */
 export function MosaicNode({ shape, preview = false }: { shape: MosaicShape; preview?: boolean }) {
   const { store, source } = useEditorContext();
@@ -173,13 +174,16 @@ export function MosaicNode({ shape, preview = false }: { shape: MosaicShape; pre
     frame.current = requestAnimationFrame(() => setMoving(settle(node)));
   };
 
-  const commit = (node: Konva.Node) => {
+  const commit = (node: Konva.Node, gesture: object) => {
     cancelAnimationFrame(frame.current);
     const next = settle(node);
     setMoving(null);
     const state = store.getState();
     if (next !== null) {
-      state.commitDoc(updateShape<MosaicShape>(currentDoc(state), shape.id, { rect: next }));
+      state.commitDoc(
+        updateShape<MosaicShape>(currentDoc(state), shape.id, { rect: next }),
+        gesture,
+      );
     }
   };
 
@@ -192,9 +196,9 @@ export function MosaicNode({ shape, preview = false }: { shape: MosaicShape; pre
       image={image}
       {...interaction}
       onDragMove={(e) => follow(e.target)}
-      onDragEnd={(e) => commit(e.target)}
+      onDragEnd={(e) => commit(e.target, e.evt)}
       onTransform={(e) => follow(e.target)}
-      onTransformEnd={(e) => commit(e.target)}
+      onTransformEnd={(e) => commit(e.target, e.evt)}
     />
   );
 }
