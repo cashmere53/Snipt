@@ -30,6 +30,13 @@ fn main() {
         "library_delete",
         "library_prune_missing",
         // --- screen-capture ---
+        "capture_overlay_ready",
+        "capture_overlay_shown",
+        "capture_overlay_magnifier",
+        "capture_overlay_pointer",
+        "capture_overlay_commit_region",
+        "capture_overlay_commit_window",
+        "capture_overlay_cancel",
         // --- annotation-editor ---
         "editor_open_session",
         "editor_read_original",

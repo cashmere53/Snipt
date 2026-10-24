@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "screen-capture-overlay",
+  "description": "Permissions for the capture overlays: core defaults (event listening included) and the overlay commands. Capturing, saving and the frozen screens stay in Rust.",
+  "windows": ["overlay-*"],
+  "permissions": [
+    "core:default",
+    "allow-capture-overlay-ready",
+    "allow-capture-overlay-shown",
+    "allow-capture-overlay-magnifier",
+    "allow-capture-overlay-pointer",
+    "allow-capture-overlay-commit-region",
+    "allow-capture-overlay-commit-window",
+    "allow-capture-overlay-cancel"
+  ]
+}

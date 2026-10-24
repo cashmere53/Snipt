@@ -222,6 +222,28 @@ impl CaptureCoordinator {
         Ok(())
     }
 
+    /// `pointer_moved` for a point local to `monitor`, as the overlays report it.
+    pub fn pointer_on_monitor(
+        &self,
+        session: SessionId,
+        monitor: MonitorIndex,
+        local: PhysicalPoint,
+    ) -> Result<(), CaptureError> {
+        let global = {
+            let mut shared = self.shared();
+            let selection = shared
+                .state
+                .selecting(session)
+                .ok_or(CaptureError::StaleSession)?;
+            let info = selection
+                .topology
+                .get(monitor)
+                .ok_or(CaptureError::OutOfRange)?;
+            info.to_global(PhysicalRect::new(local.x, local.y, 1, 1))
+        };
+        self.pointer_moved(session, PhysicalPoint::new(global.x, global.y))
+    }
+
     /// Region mode: takes `local` (on `monitor`, kept inside it) as the capture.
     pub fn commit_region(
         &self,
