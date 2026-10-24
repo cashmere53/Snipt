@@ -31,7 +31,8 @@ export function useViewSize(): void {
 /** The client position of image point `at`. */
 const client = (at: Point) => ({ clientX: ORIGIN.x + at.x, clientY: ORIGIN.y + at.y });
 
-function gray(): HTMLCanvasElement {
+/** A striped gray image of `IMAGE`'s size. */
+export function grayImage(): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = IMAGE.width;
   canvas.height = IMAGE.height;
@@ -51,7 +52,7 @@ export function renderCanvas(doc: Partial<AnnotationDocument> = {}) {
     style: DEFAULT_STYLE,
     newId,
   });
-  const source = new ImageSource(gray());
+  const source = new ImageSource(grayImage());
   const result = render(
     <EditorContext.Provider value={{ store, source, newId }}>
       <EditorCanvas />

@@ -368,3 +368,27 @@ fn the_asked_editor_answers_its_flush_request() {
         Ok(false)
     );
 }
+
+#[test]
+fn capability_allows_only_the_editor_windows() {
+    let capability: Value =
+        serde_json::from_str(include_str!("../../../capabilities/editor.json")).unwrap();
+    assert_eq!(capability["windows"], json!(["editor-*"]));
+    let permissions: Vec<&str> = capability["permissions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p.as_str().unwrap())
+        .collect();
+    for command in COMMANDS {
+        let permission = format!("allow-{}", command.replace('_', "-"));
+        assert!(permissions.contains(&permission.as_str()), "{permission}");
+    }
+    // Other windows' capabilities never allow an editor command.
+    for other in [
+        include_str!("../../../capabilities/app-shell.json"),
+        include_str!("../../../capabilities/history.json"),
+    ] {
+        assert!(!other.contains("allow-editor-"));
+    }
+}
