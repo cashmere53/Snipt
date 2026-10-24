@@ -16,14 +16,21 @@ describe("resolveWindowRoute", () => {
   });
 
   it("passes the monitor index of an overlay window as a number", () => {
-    expect(resolveWindowRoute("overlay-1")).toEqual({ kind: "overlay", monitorIndex: 1 });
-    expect(resolveWindowRoute("overlay-0")).toEqual({ kind: "overlay", monitorIndex: 0 });
+    expect(resolveWindowRoute("overlay-1-1")).toEqual({ kind: "overlay", monitorIndex: 1 });
+    expect(resolveWindowRoute("overlay-12-0")).toEqual({ kind: "overlay", monitorIndex: 0 });
   });
 
-  it.each(["main", "editor-", "overlay-", "overlay-x", "overlay--1", "Settings"])(
-    "treats %s as unknown",
-    (label) => {
-      expect(resolveWindowRoute(label)).toEqual({ kind: "unknown", label });
-    },
-  );
+  it.each([
+    "main",
+    "editor-",
+    "overlay-",
+    "overlay-1",
+    "overlay-x",
+    "overlay--1",
+    "overlay-1-",
+    "overlay-1-x",
+    "Settings",
+  ])("treats %s as unknown", (label) => {
+    expect(resolveWindowRoute(label)).toEqual({ kind: "unknown", label });
+  });
 });
