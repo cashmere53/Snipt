@@ -10,6 +10,8 @@ import { addShape } from "../model/operations";
 import { currentDoc } from "../store/editor-store";
 import { useEditor, useEditorContext } from "../store/editor-context";
 import { stageScale } from "../store/view";
+import { TextEditorOverlay } from "../ui/TextEditorOverlay";
+import "../ui/editor.css";
 import { CropOverlay } from "./CropOverlay";
 import { SelectionHandles } from "./SelectionHandles";
 import { MosaicNode, SHAPE_NODE, ShapeNode, ShapeView } from "./ShapeNode";
@@ -292,6 +294,7 @@ export function EditorCanvas() {
           </Layer>
         ) : null}
       </Stage>
+      <TextEditorOverlay />
     </div>
   );
 }
