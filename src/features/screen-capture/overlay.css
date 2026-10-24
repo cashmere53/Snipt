@@ -1,0 +1,71 @@
+/* The overlay covers its monitor exactly and is transparent where nothing is drawn. */
+html.overlay-page,
+html.overlay-page body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  user-select: none;
+  font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+}
+
+.overlay-region {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.overlay-region canvas {
+  display: block;
+}
+
+.overlay-size {
+  position: absolute;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 70%);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.overlay-magnifier {
+  position: absolute;
+  border: 1px solid #fff;
+  background: #000;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 50%);
+  pointer-events: none;
+}
+
+.overlay-magnifier canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.overlay-coords {
+  padding: 2px 4px;
+  background: rgb(0 0 0 / 80%);
+  color: #fff;
+  font-size: 11px;
+  text-align: center;
+}
+
+/* Nearly transparent rather than transparent, so that clicks land on the overlay. */
+.overlay-window {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.4%);
+}
+
+.overlay-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid #2f80ed;
+  background: rgb(47 128 237 / 12%);
+  pointer-events: none;
+}

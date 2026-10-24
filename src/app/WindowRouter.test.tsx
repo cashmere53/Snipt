@@ -1,4 +1,4 @@
-import { mockIPC } from "@tauri-apps/api/mocks";
+import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WindowRouter } from "./WindowRouter";
@@ -18,8 +18,9 @@ describe("WindowRouter", () => {
     ["settings", "SettingsWindow"],
     ["history", "HistoryWindow"],
     ["editor-abc", "EditorWindow"],
-    ["overlay-1", "OverlayWindow"],
+    ["overlay-1-1", "OverlayWindow"],
   ])("renders the %s window", async (label, testId) => {
+    mockWindows(label);
     render(<WindowRouter label={label} />);
     expect(await screen.findByTestId(testId)).toBeInTheDocument();
   });
