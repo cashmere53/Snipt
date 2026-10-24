@@ -159,7 +159,7 @@
   - _Depends: 2.4_
   - _Requirements: 2.1, 2.4_
 
-- [ ] 5.4 (P) WGC による単体ウィンドウ撮影
+- [x] 5.4 (P) WGC による単体ウィンドウ撮影
   - D3D11 デバイスを初回利用時に作って保持し、ウィンドウから撮影アイテムを作って 1 フレームだけ取得する。内容サイズで切り詰めて読み出し、非乗算 RGBA にする
   - 対応する OS ではカーソル撮影を無効にし、Windows 11 で許可された場合は黄色枠を無効にする(起動時に枠なしアクセスを要求し、可否をログに出す)
   - 最初のフレームをタイムアウトまで待ち、デバイス消失時は再生成して 1 回だけ再試行する
@@ -169,7 +169,7 @@
   - _Depends: 2.3_
   - _Requirements: 2.3, 4.1, 4.4_
 
-- [ ] 5.5 PrintWindow フォールバックと撮影失敗の判定
+- [x] 5.5 PrintWindow フォールバックと撮影失敗の判定
   - WGC が失敗した場合のみ、PrintWindow(全内容描画)を別スレッドとタイムアウト付きで試す
   - 両方失敗したらウィンドウ撮影失敗のエラーを返す
   - 実機テスト(既定で無視): WGC を強制的に失敗させたとき PrintWindow で撮れる、応答しないウィンドウでタイムアウトして失敗が返る
@@ -193,7 +193,7 @@
   - _Boundary: platform::windows::display_watch_
   - _Requirements: 4.3_
 
-- [ ] 5.8 プラットフォームアダプタの統合
+- [x] 5.8 プラットフォームアダプタの統合
   - 5.1〜5.5 を束ねて OS 撮影ポートを実装する
   - 完了時: OS 撮影ポートの実装が Windows 向けにビルドでき、実機の簡易テスト(既定で無視)で構成取得・凍結・列挙・ウィンドウ撮影が一通り呼べる
   - _Depends: 3.1, 5.1, 5.2, 5.3, 5.4, 5.5_
@@ -320,4 +320,7 @@
 - 5.2: 画面 DC → DIB セクション(`screen_grab::top_down_bgra`)へ `BitBlt(SRCCOPY)` し、`GdiFlush` 後に画素を `Arc<[u8]>` へコピーして DIB はすぐ解放する。失敗はモニタ番号付きの `GrabFailed`。
 - 5.3: OS から読んだ状態を `TopLevelWindow` にして `window_pick::candidates` に渡す。DWM 属性が読めないウィンドウは空矩形として候補から外れる。
 - 5.7: `display_watch::watch(on_change)` はプロセス終了まで残る非表示ウィンドウを作る(`Win32_System_LibraryLoader` を追加)。`WM_DISPLAYCHANGE` / `WM_DPICHANGED` は常に、`WM_SETTINGCHANGE` は構成指紋が変わったときだけ通知する(無関係な設定変更で撮影が取り消されないため)。
-- 5.1〜5.3・5.7 の実機テストは `#[ignore]` 付き。Windows 実機で `cargo test --lib platform::windows -- --ignored --nocapture` を実行して確認する(未実施)。
+- 5.4: 最初のフレームは `TryGetNextFrame` を 5ms 間隔で期限まで待つ(イベントハンドラを使わない)。ハードウェアの D3D11 デバイスが作れない環境(リモートデスクトップ・VM)では WARP を使う。読み出しは premultiplied BGRA → 非乗算 RGBA の純粋関数 `compose::from_premultiplied_bgra`。枠なし撮影の可否は `WinCapturePlatform::request_borderless` で起動時に問い合わせる(`Security_Authorization_AppCapabilityAccess` を追加)。
+- 5.5: PrintWindow の結果は `compose_region` で拡張フレーム境界に切り詰め、不透明にする。タイムアウトしたスレッドは放置する(応答しないウィンドウからは戻らないため)。両方失敗したときの理由は「WGC の理由; PrintWindow: 理由」。
+- 5.8: `capture_platform::init_capture_thread`(スレッド PMv2 + `RoInitialize(MTA)`)をワーカーの `init` に渡す。5.6(背景ウィンドウ)はオーバーレイ(6.x)と合わせて実装する。
+- 5.1〜5.5・5.7・5.8 の実機テストは `#[ignore]` 付き。Windows 実機で `cargo test --lib platform::windows -- --ignored --nocapture` を実行して確認する(未実施)。

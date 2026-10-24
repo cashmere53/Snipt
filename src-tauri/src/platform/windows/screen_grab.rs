@@ -3,7 +3,6 @@
 //! windows still are on Windows 8 and later (DWM composes them into the screen).
 
 use std::ffi::c_void;
-use std::mem::size_of;
 use std::ptr;
 
 use windows::Win32::Graphics::Gdi::{
@@ -50,58 +49,35 @@ pub fn grab_monitors(topology: &MonitorTopology) -> Result<Vec<FrozenFrame>, Cap
 
 fn grab(screen: &ScreenDc, monitor: &MonitorInfo) -> Result<FrozenFrame, String> {
     let rect = monitor.rect;
-    let (width, height) = (rect.width as i32, rect.height as i32);
-    let stride = rect.width as usize * 4;
-    let memory = MemoryDc::compatible_with(screen.0)?;
-    let info = top_down_bgra(rect.width, rect.height);
-    let mut bits: *mut c_void = ptr::null_mut();
-    // SAFETY: `info` describes a 32 bpp DIB and `bits` is valid for writes.
-    let bitmap =
-        unsafe { CreateDIBSection(Some(screen.0), &info, DIB_RGB_COLORS, &mut bits, None, 0) }
-            .map_err(|e| format!("CreateDIBSection: {e}"))?;
-    let bitmap = Bitmap(bitmap);
-    if bits.is_null() {
-        return Err("CreateDIBSection returned no pixels".to_owned());
-    }
-    // SAFETY: `memory` and `bitmap` are alive; the old object is put back below.
-    let previous = unsafe { SelectObject(memory.0, bitmap.0.into()) };
+    let canvas = Canvas::new(screen.dc(), rect.width, rect.height)?;
     // SAFETY: both DCs are alive; the source rectangle is the monitor on the screen DC.
-    let copied = unsafe {
+    unsafe {
         BitBlt(
-            memory.0,
+            canvas.dc(),
             0,
             0,
-            width,
-            height,
-            Some(screen.0),
+            rect.width as i32,
+            rect.height as i32,
+            Some(screen.dc()),
             rect.x,
             rect.y,
             SRCCOPY,
         )
-    };
-    // SAFETY: as above.
-    unsafe {
-        let _ = GdiFlush();
-        SelectObject(memory.0, previous);
     }
-    copied.map_err(|e| format!("BitBlt: {e}"))?;
-    // SAFETY: the DIB section holds `stride * height` bytes until `bitmap` is dropped, and
-    // GDI has finished writing (GdiFlush).
-    let pixels =
-        unsafe { std::slice::from_raw_parts(bits.cast::<u8>(), stride * rect.height as usize) };
+    .map_err(|e| format!("BitBlt: {e}"))?;
     Ok(FrozenFrame {
         monitor: monitor.index,
         rect,
-        stride,
-        bgra: pixels.into(),
+        stride: canvas.stride(),
+        bgra: canvas.pixels().into(),
     })
 }
 
 /// The screen DC, released on drop.
-struct ScreenDc(HDC);
+pub(super) struct ScreenDc(HDC);
 
 impl ScreenDc {
-    fn get() -> Result<Self, CaptureError> {
+    pub(super) fn get() -> Result<Self, CaptureError> {
         // SAFETY: plain call; released on drop.
         let dc = unsafe { GetDC(None) };
         if dc.is_invalid() {
@@ -110,6 +86,10 @@ impl ScreenDc {
             ));
         }
         Ok(Self(dc))
+    }
+
+    pub(super) fn dc(&self) -> HDC {
+        self.0
     }
 }
 
@@ -120,37 +100,84 @@ impl Drop for ScreenDc {
     }
 }
 
-/// A memory DC, deleted on drop.
-struct MemoryDc(HDC);
+/// A memory DC with a top-down BGRA DIB section selected, to draw into and read back. Both
+/// are freed on drop.
+pub(super) struct Canvas {
+    memory: HDC,
+    bitmap: HBITMAP,
+    previous: HGDIOBJ,
+    bits: *const u8,
+    width: u32,
+    height: u32,
+}
 
-impl MemoryDc {
-    fn compatible_with(dc: HDC) -> Result<Self, String> {
+impl Canvas {
+    /// A canvas of `width × height` compatible with `dc`.
+    pub(super) fn new(dc: HDC, width: u32, height: u32) -> Result<Self, String> {
         // SAFETY: `dc` is alive.
         let memory = unsafe { CreateCompatibleDC(Some(dc)) };
         if memory.is_invalid() {
             return Err("CreateCompatibleDC failed".to_owned());
         }
-        Ok(Self(memory))
+        let info = top_down_bgra(width, height);
+        let mut bits: *mut c_void = ptr::null_mut();
+        // SAFETY: `info` describes a 32 bpp DIB and `bits` is valid for writes.
+        let bitmap = match unsafe {
+            CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
+        } {
+            Ok(bitmap) if !bits.is_null() => bitmap,
+            result => {
+                // SAFETY: the DC and the bitmap (if any) are ours and selected nowhere.
+                unsafe {
+                    if let Ok(bitmap) = result {
+                        let _ = DeleteObject(bitmap.into());
+                    }
+                    let _ = DeleteDC(memory);
+                }
+                return Err(format!(
+                    "CreateDIBSection {width}x{height}: {}",
+                    result
+                        .err()
+                        .map_or("no pixels".to_owned(), |e| e.to_string())
+                ));
+            }
+        };
+        // SAFETY: both are alive; the previous object is put back on drop.
+        let previous = unsafe { SelectObject(memory, bitmap.into()) };
+        Ok(Self {
+            memory,
+            bitmap,
+            previous,
+            bits: bits.cast(),
+            width,
+            height,
+        })
+    }
+
+    pub(super) fn dc(&self) -> HDC {
+        self.memory
+    }
+
+    pub(super) fn stride(&self) -> usize {
+        self.width as usize * 4
+    }
+
+    /// The pixels drawn so far, top row first.
+    pub(super) fn pixels(&self) -> &[u8] {
+        // SAFETY: plain call; makes GDI finish drawing before the pixels are read.
+        let _ = unsafe { GdiFlush() };
+        // SAFETY: the DIB section holds `stride * height` bytes while `self` is alive.
+        unsafe { std::slice::from_raw_parts(self.bits, self.stride() * self.height as usize) }
     }
 }
 
-impl Drop for MemoryDc {
+impl Drop for Canvas {
     fn drop(&mut self) {
-        // SAFETY: the DC came from `CreateCompatibleDC` and has its own bitmap selected again.
+        // SAFETY: the DC and the bitmap are ours; the bitmap is deselected before deletion.
         unsafe {
-            let _ = DeleteDC(self.0);
-        }
-    }
-}
-
-/// A DIB section, deleted on drop.
-struct Bitmap(HBITMAP);
-
-impl Drop for Bitmap {
-    fn drop(&mut self) {
-        // SAFETY: the bitmap is not selected into any DC any more.
-        unsafe {
-            let _ = DeleteObject(HGDIOBJ::from(self.0));
+            SelectObject(self.memory, self.previous);
+            let _ = DeleteDC(self.memory);
+            let _ = DeleteObject(self.bitmap.into());
         }
     }
 }
