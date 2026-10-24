@@ -23,6 +23,9 @@ pub enum CaptureError {
     /// A request for a session that has ended.
     #[error("the capture session has ended")]
     StaleSession,
+    /// A magnifier request for a point or monitor outside the session's screens.
+    #[error("the point is outside the frozen screens")]
+    OutOfRange,
     #[error("{0}")]
     Internal(String),
 }
