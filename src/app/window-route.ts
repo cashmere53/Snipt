@@ -1,6 +1,7 @@
 /**
  * Maps a Tauri window label to the view it should render.
- * Labels: `settings`, `history`, `editor-<captureId>`, `overlay-<monitorIndex>`.
+ * Labels: `settings`, `history`, `editor-<captureId>`, `overlay-<build>-<monitorIndex>`
+ * (a new build number each time the overlays are rebuilt).
  */
 export type WindowRoute =
   | { kind: "settings" }
@@ -23,7 +24,8 @@ export function resolveWindowRoute(label: string): WindowRoute {
 
   if (label.startsWith(OVERLAY_PREFIX)) {
     const rest = label.slice(OVERLAY_PREFIX.length);
-    if (/^\d+$/.test(rest)) return { kind: "overlay", monitorIndex: Number(rest) };
+    const match = /^\d+-(\d+)$/.exec(rest);
+    if (match) return { kind: "overlay", monitorIndex: Number(match[1]) };
   }
 
   return { kind: "unknown", label };
