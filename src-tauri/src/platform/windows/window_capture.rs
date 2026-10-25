@@ -23,8 +23,8 @@ use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP,
 };
 use windows::Win32::Graphics::Direct3D11::{
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_BOX,
-    D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAPPED_SUBRESOURCE,
+    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Multithread, ID3D11Texture2D,
+    D3D11_BOX, D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAPPED_SUBRESOURCE,
     D3D11_MAP_READ, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
 };
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
@@ -184,6 +184,11 @@ fn create_devices() -> Result<Devices, Error> {
         log::warn!("capture: no hardware D3D11 device, using WARP: {error}");
         create_device(D3D_DRIVER_TYPE_WARP)
     })?;
+    // WGC's free-threaded frame pool uses the device from its own threads while this one
+    // copies from the immediate context: without the device's lock they race (and crash).
+    let multithread: ID3D11Multithread = device.cast()?;
+    // SAFETY: plain call on a live device; the result is the previous setting.
+    let _ = unsafe { multithread.SetMultithreadProtected(true) };
     // SAFETY: plain call on a live device.
     let context = unsafe { device.GetImmediateContext() }?;
     let dxgi: IDXGIDevice = device.cast()?;
@@ -257,6 +262,8 @@ fn first_frame(
         }
         thread::sleep(POLL);
     };
+    // One frame is enough: stop capturing before reading it back.
+    session.Close()?;
     let content = frame.ContentSize()?;
     let access: IDirect3DDxgiInterfaceAccess = frame.Surface()?.cast()?;
     // SAFETY: the surface of a frame of a D3D11 frame pool is a 2D texture.
@@ -429,6 +436,8 @@ mod tests {
         init();
         let capture = WindowCapture::new();
         capture.request_borderless();
+        // Where it stops tells which half failed, should the process crash.
+        println!("borderless asked");
         // SAFETY: plain call.
         let hwnd = unsafe { GetForegroundWindow() }.0 as isize;
         let image = capture

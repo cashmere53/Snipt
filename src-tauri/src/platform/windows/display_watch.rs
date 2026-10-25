@@ -124,6 +124,7 @@ mod tests {
     #[ignore = "needs real monitors and a person"]
     fn reports_real_layout_changes() {
         use_per_monitor_v2_on_this_thread();
+        println!("change the display scale or unplug a monitor within 30 seconds");
         let changes = Rc::new(Cell::new(0));
         let seen = changes.clone();
         watch(move || {
