@@ -81,6 +81,43 @@ pub fn patch(frame: &FrozenFrame, center: PhysicalPoint, radius: u32) -> PixelPa
     compose_region(std::slice::from_ref(frame), around)
 }
 
+/// A window image as Windows.Graphics.Capture gives it (premultiplied BGRA rows of `stride`
+/// bytes) as straight RGBA. Rows missing from `bgra` stay transparent.
+pub fn from_premultiplied_bgra(
+    bgra: &[u8],
+    width: u32,
+    height: u32,
+    stride: usize,
+) -> CapturedImage {
+    let row_bytes = width as usize * 4;
+    let mut rgba = vec![0u8; row_bytes * height as usize];
+    for (y, dst) in rgba.chunks_exact_mut(row_bytes).enumerate() {
+        let start = y * stride;
+        let Some(src) = bgra.get(start..start + row_bytes) else {
+            break;
+        };
+        for (to, from) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            let alpha = from[3];
+            let straight = |c: u8| match alpha {
+                0 => 0,
+                255 => c,
+                a => ((u32::from(c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8,
+            };
+            to.copy_from_slice(&[
+                straight(from[2]),
+                straight(from[1]),
+                straight(from[0]),
+                alpha,
+            ]);
+        }
+    }
+    CapturedImage {
+        width,
+        height,
+        rgba,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +221,24 @@ mod tests {
         assert_eq!(pixel(&patch, 1, 2), [0, 0, 0, 0]);
         let largest = super::patch(&f, PhysicalPoint::new(125, 125), 100);
         assert_eq!(largest.width, 2 * MAX_PATCH_RADIUS + 1);
+    }
+
+    #[test]
+    fn turns_premultiplied_bgra_into_straight_rgba() {
+        // Opaque, half-transparent red at half intensity, fully transparent; 4 padding bytes.
+        let bgra = [
+            10, 20, 30, 255, 0, 0, 64, 128, 0, 0, 0, 0, 0xEE, 0xEE, 0xEE, 0xEE, //
+            1, 2, 3, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0xEE, 0xEE, 0xEE, 0xEE,
+        ];
+        let image = from_premultiplied_bgra(&bgra, 3, 2, 16);
+        assert_eq!((image.width, image.height), (3, 2));
+        assert_eq!(pixel(&image, 0, 0), [30, 20, 10, 255]);
+        assert_eq!(pixel(&image, 1, 0), [128, 0, 0, 128]);
+        assert_eq!(pixel(&image, 2, 0), [0, 0, 0, 0]);
+        assert_eq!(pixel(&image, 0, 1), [3, 2, 1, 255]);
+        assert_eq!(pixel(&image, 2, 1), [255, 255, 255, 255]);
+        // A short buffer leaves the missing row transparent.
+        let short = from_premultiplied_bgra(&bgra[..16], 3, 2, 16);
+        assert_eq!(pixel(&short, 0, 1), [0, 0, 0, 0]);
     }
 }
