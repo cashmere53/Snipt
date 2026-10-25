@@ -35,9 +35,9 @@ impl WinCapturePlatform {
         Self::default()
     }
 
-    /// Asks for captures without the yellow border; call it once on the capture worker.
-    pub fn request_borderless(&self) {
-        self.windows.request_borderless();
+    /// Logs whether window captures can leave out the yellow border.
+    pub fn log_border_support(&self) {
+        self.windows.log_border_support();
     }
 }
 
@@ -79,7 +79,7 @@ mod tests {
     fn every_call_works_on_a_real_desktop() {
         init_capture_thread();
         let platform = WinCapturePlatform::new();
-        platform.request_borderless();
+        platform.log_border_support();
         let topology = platform.topology().unwrap();
         println!(
             "{} monitors, cursor at {:?}",

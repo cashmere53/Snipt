@@ -86,7 +86,7 @@ fn production_ports<R: Runtime>(
     let startup_platform = platform.clone();
     worker.run(Box::new(move || {
         log_dpi_awareness_and_os_build();
-        startup_platform.request_borderless();
+        startup_platform.log_border_support();
     }));
     let main = app.clone();
     let native = WinOverlayNative::new(Arc::new(move |job| {
