@@ -321,6 +321,6 @@
 - 5.3: OS から読んだ状態を `TopLevelWindow` にして `window_pick::candidates` に渡す。DWM 属性が読めないウィンドウは空矩形として候補から外れる。
 - 5.7: `display_watch::watch(on_change)` はプロセス終了まで残る非表示ウィンドウを作る(`Win32_System_LibraryLoader` を追加)。`WM_DISPLAYCHANGE` / `WM_DPICHANGED` は常に、`WM_SETTINGCHANGE` は構成指紋が変わったときだけ通知する(無関係な設定変更で撮影が取り消されないため)。
 - 5.4: 最初のフレームは `TryGetNextFrame` を 5ms 間隔で期限まで待つ(イベントハンドラを使わない)。ハードウェアの D3D11 デバイスが作れない環境(リモートデスクトップ・VM)では WARP を使う。読み出しは premultiplied BGRA → 非乗算 RGBA の純粋関数 `compose::from_premultiplied_bgra`。枠なし撮影の可否は `WinCapturePlatform::request_borderless` で起動時に問い合わせる(`Security_Authorization_AppCapabilityAccess` を追加)。
-- 5.5: PrintWindow の結果は `compose_region` で拡張フレーム境界に切り詰め、不透明にする。タイムアウトしたスレッドは放置する(応答しないウィンドウからは戻らないため)。両方失敗したときの理由は「WGC の理由; PrintWindow: 理由」。
+- 5.5: 期限は 1 つで、WGC に 2/3、PrintWindow に残りを充てる(PrintWindow のスレッドも PMv2 にする)。PrintWindow の結果は `compose_region` で拡張フレーム境界に切り詰め、不透明にする。タイムアウトしたスレッドは放置する(応答しないウィンドウからは戻らないため)。両方失敗したときの理由は「WGC の理由; PrintWindow: 理由」。
 - 5.8: `capture_platform::init_capture_thread`(スレッド PMv2 + `RoInitialize(MTA)`)をワーカーの `init` に渡す。5.6(背景ウィンドウ)はオーバーレイ(6.x)と合わせて実装する。
 - 5.1〜5.5・5.7・5.8 の実機テストは `#[ignore]` 付き。Windows 実機で `cargo test --lib platform::windows -- --ignored --nocapture` を実行して確認する(未実施)。

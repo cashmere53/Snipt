@@ -38,7 +38,7 @@ use windows::Win32::System::WinRT::Direct3D11::{
 use windows::Win32::System::WinRT::Graphics::Capture::IGraphicsCaptureItemInterop;
 use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, PW_RENDERFULLCONTENT};
 
-use super::monitors::physical_rect;
+use super::monitors::{physical_rect, use_per_monitor_v2_on_this_thread};
 use super::screen_grab::{Canvas, ScreenDc};
 use crate::screen_capture::compose::{
     compose_region, from_premultiplied_bgra, CapturedImage, FrozenFrame,
@@ -106,24 +106,28 @@ impl WindowCapture {
         }
     }
 
-    /// The window's image without what covers it; PrintWindow when WGC fails.
+    /// The window's image without what covers it; PrintWindow when WGC fails. Gives up after
+    /// `timeout` in all: WGC gets two thirds of it, PrintWindow what is left.
     pub fn capture(&self, hwnd: isize, timeout: Duration) -> Result<CapturedImage, CaptureError> {
-        let wgc = match self.capture_wgc(hwnd, timeout) {
+        let started = Instant::now();
+        let deadline = started + timeout;
+        let wgc = match self.capture_wgc(hwnd, started + timeout * 2 / 3) {
             Ok(image) => return Ok(image),
             Err(error) => error,
         };
         log::warn!("capture: Windows.Graphics.Capture failed, trying PrintWindow: {wgc}");
-        print_window(hwnd, timeout).map_err(|print| CaptureError::WindowCaptureFailed {
+        let left = deadline.saturating_duration_since(Instant::now());
+        print_window(hwnd, left).map_err(|print| CaptureError::WindowCaptureFailed {
             reason: format!("{wgc}; PrintWindow: {print}"),
         })
     }
 
-    fn capture_wgc(&self, hwnd: isize, timeout: Duration) -> Result<CapturedImage, Error> {
+    fn capture_wgc(&self, hwnd: isize, deadline: Instant) -> Result<CapturedImage, Error> {
         let devices = self.devices()?;
         match first_frame(
             &devices,
             hwnd,
-            timeout,
+            deadline,
             self.borderless.load(Ordering::Relaxed),
         ) {
             Err(error) if is_device_lost(&error) => {
@@ -133,7 +137,7 @@ impl WindowCapture {
                 first_frame(
                     &devices,
                     hwnd,
-                    timeout,
+                    deadline,
                     self.borderless.load(Ordering::Relaxed),
                 )
             }
@@ -211,11 +215,12 @@ fn create_device(driver: D3D_DRIVER_TYPE) -> Result<ID3D11Device, Error> {
     device.ok_or_else(|| Error::from(E_POINTER))
 }
 
-/// Starts a capture session on the window, waits for one frame and reads it back.
+/// Starts a capture session on the window, waits until `deadline` for one frame and reads it
+/// back.
 fn first_frame(
     devices: &Devices,
     hwnd: isize,
-    timeout: Duration,
+    deadline: Instant,
     borderless: bool,
 ) -> Result<CapturedImage, Error> {
     let interop = factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
@@ -237,7 +242,6 @@ fn first_frame(
     }
     session.StartCapture()?;
 
-    let deadline = Instant::now() + timeout;
     let frame = loop {
         match pool.TryGetNextFrame() {
             Ok(frame) => break frame,
@@ -339,6 +343,8 @@ fn print_window(hwnd: isize, timeout: Duration) -> Result<CapturedImage, String>
     thread::Builder::new()
         .name("capture-printwindow".to_owned())
         .spawn(move || {
+            // Physical pixels, like the capture worker.
+            use_per_monitor_v2_on_this_thread();
             let _ = tx.send(print_window_now(hwnd));
         })
         .map_err(|e| format!("could not start a thread: {e}"))?;
@@ -395,7 +401,6 @@ mod tests {
     use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
     use super::*;
-    use crate::platform::windows::monitors::use_per_monitor_v2_on_this_thread;
 
     fn init() {
         use_per_monitor_v2_on_this_thread();
@@ -426,7 +431,9 @@ mod tests {
         capture.request_borderless();
         // SAFETY: plain call.
         let hwnd = unsafe { GetForegroundWindow() }.0 as isize;
-        let image = capture.capture_wgc(hwnd, Duration::from_secs(1)).unwrap();
+        let image = capture
+            .capture_wgc(hwnd, Instant::now() + Duration::from_secs(1))
+            .unwrap();
         save(&image, "wgc");
     }
 
@@ -445,10 +452,13 @@ mod tests {
     #[ignore = "needs a real desktop"]
     fn a_window_that_does_not_exist_fails() {
         init();
+        let started = Instant::now();
         let error = WindowCapture::new()
             .capture(0x7fff_fff0, Duration::from_millis(500))
             .unwrap_err();
         println!("{error}");
+        // Both attempts share the one deadline.
+        assert!(started.elapsed() < Duration::from_millis(600));
         assert!(matches!(error, CaptureError::WindowCaptureFailed { .. }));
     }
 }
