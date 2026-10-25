@@ -395,13 +395,14 @@ impl<R: Runtime> OverlayPresenter for OverlayManager<R> {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, not(test)))]
 fn hwnd_of<R: Runtime>(window: &WebviewWindow<R>) -> Option<isize> {
     window.hwnd().ok().map(|hwnd| hwnd.0 as isize)
 }
 
-/// Snipt targets Windows only; elsewhere (tests) windows have no handle.
-#[cfg(not(windows))]
+/// Snipt targets Windows only; elsewhere, and in tests (where the mock runtime hands out a
+/// made-up handle), windows have no handle.
+#[cfg(any(not(windows), test))]
 fn hwnd_of<R: Runtime>(_window: &WebviewWindow<R>) -> Option<isize> {
     None
 }
