@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::geometry::{PhysicalPoint, PhysicalRect};
 
-/// A monitor's position in `MonitorTopology::monitors`, and its overlay's `overlay-<i>`.
+/// A monitor's position in `MonitorTopology::monitors`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MonitorIndex(pub u32);
 

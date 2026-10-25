@@ -487,6 +487,35 @@ fn moving_the_pointer_updates_the_highlight() {
 }
 
 #[test]
+fn overlays_report_the_pointer_in_their_monitors_coordinates() {
+    let f = Fixture::new();
+    f.set_windows();
+    *f.platform.cursor.lock().unwrap() = PhysicalPoint::new(-100, 50);
+    f.coordinator.request_capture(CaptureMode::Window);
+    f.take_calls();
+    // Local (1000, 900) on the primary monitor at (0, 0); on the 4K one, left of it, the same
+    // local point is global (-2840, 900), where no window is.
+    f.coordinator
+        .pointer_on_monitor(FIRST, PRIMARY, PhysicalPoint::new(1000, 900))
+        .unwrap();
+    f.coordinator
+        .pointer_on_monitor(FIRST, MonitorIndex(0), PhysicalPoint::new(1000, 900))
+        .unwrap();
+    assert_eq!(
+        f.take_calls(),
+        [
+            "highlight 1 Some(PhysicalRect { x: 0, y: 0, width: 1920, height: 1080 })",
+            "highlight 1 None",
+        ]
+    );
+    assert_eq!(
+        f.coordinator
+            .pointer_on_monitor(FIRST, MonitorIndex(5), PhysicalPoint::new(0, 0)),
+        Err(CaptureError::OutOfRange)
+    );
+}
+
+#[test]
 fn a_committed_window_is_captured_with_its_title() {
     let f = Fixture::new();
     f.set_windows();
