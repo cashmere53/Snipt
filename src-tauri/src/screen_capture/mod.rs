@@ -173,6 +173,8 @@ mod unsupported {
 
         fn place_topmost(&self, _: isize, _: PhysicalRect) {}
 
+        fn hide_overlay(&self, _: isize) {}
+
         fn rebuild_backdrops(&self, _: &MonitorTopology) -> Result<(), CaptureError> {
             Ok(())
         }

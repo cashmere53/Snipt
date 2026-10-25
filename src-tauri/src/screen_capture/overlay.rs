@@ -85,6 +85,9 @@ pub trait OverlayNative: Send + Sync {
     fn prepare_overlay(&self, hwnd: isize);
     /// Shows the overlay topmost over `rect`, without activating it.
     fn place_topmost(&self, hwnd: isize, rect: PhysicalRect);
+    /// Hides an overlay shown by `place_topmost`. Tauri never saw it shown, so its own
+    /// `hide` would do nothing.
+    fn hide_overlay(&self, hwnd: isize);
     /// One hidden backdrop per monitor of `topology`, replacing the old ones.
     fn rebuild_backdrops(&self, topology: &MonitorTopology) -> Result<(), CaptureError>;
     /// Shows each frame on its monitor's backdrop.
@@ -370,8 +373,13 @@ impl<R: Runtime> OverlayPresenter for OverlayManager<R> {
                 }
             }
             if let Some(window) = self.app.get_webview_window(label) {
-                if let Err(error) = window.hide() {
-                    log::warn!("capture: could not hide {label}: {error}");
+                match hwnd_of(&window) {
+                    Some(hwnd) => self.native.hide_overlay(hwnd),
+                    None => {
+                        if let Err(error) = window.hide() {
+                            log::warn!("capture: could not hide {label}: {error}");
+                        }
+                    }
                 }
             }
         }
@@ -436,6 +444,10 @@ pub mod fake {
                 .lock()
                 .unwrap()
                 .push(format!("place {hwnd} {rect:?}"));
+        }
+
+        fn hide_overlay(&self, hwnd: isize) {
+            self.calls.lock().unwrap().push(format!("hide {hwnd}"));
         }
 
         fn rebuild_backdrops(&self, topology: &MonitorTopology) -> Result<(), CaptureError> {
