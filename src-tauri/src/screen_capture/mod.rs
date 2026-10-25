@@ -15,6 +15,7 @@ pub mod post_capture;
 pub mod session;
 pub mod topology;
 pub mod window_pick;
+pub mod worker;
 
 use tauri::{App, Runtime};
 

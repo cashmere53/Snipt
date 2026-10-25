@@ -77,6 +77,17 @@ impl CaptureClipboard for SystemClipboard {
     }
 }
 
+/// Where the coordinator hands a committed capture; `PostCaptureFlow` in the app.
+pub trait PostCaptureSink: Send + Sync {
+    fn deliver(&self, outcome: CaptureOutcome);
+}
+
+impl PostCaptureSink for PostCaptureFlow {
+    fn deliver(&self, outcome: CaptureOutcome) {
+        self.run(outcome);
+    }
+}
+
 pub struct PostCaptureFlow {
     clipboard: Arc<dyn CaptureClipboard>,
     store: Arc<dyn CaptureStore>,

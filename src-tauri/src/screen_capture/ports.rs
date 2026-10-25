@@ -82,6 +82,8 @@ pub mod fake {
         pub topology: Mutex<Result<MonitorTopology, CaptureError>>,
         pub cursor: Mutex<PhysicalPoint>,
         pub grab_error: Mutex<Option<CaptureError>>,
+        /// `grab_monitors` panics, as a bug in an adapter would.
+        pub grab_panics: Mutex<bool>,
         pub windows: Mutex<Vec<WindowCandidate>>,
         pub window_image: Mutex<Result<CapturedImage, CaptureError>>,
     }
@@ -95,6 +97,7 @@ pub mod fake {
                 topology: Mutex::new(Ok(mixed_dpi())),
                 cursor: Mutex::new(PhysicalPoint::new(100, 100)),
                 grab_error: Mutex::new(None),
+                grab_panics: Mutex::new(false),
                 windows: Mutex::new(Vec::new()),
                 window_image: Mutex::new(Ok(CapturedImage {
                     width: 2,
@@ -120,6 +123,7 @@ pub mod fake {
             topology: &MonitorTopology,
         ) -> Result<Vec<FrozenFrame>, CaptureError> {
             record(&self.calls, "grab_monitors");
+            assert!(!*self.grab_panics.lock().unwrap(), "grab_monitors panicked");
             if let Some(error) = self.grab_error.lock().unwrap().clone() {
                 return Err(error);
             }
