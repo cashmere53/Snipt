@@ -53,8 +53,8 @@
   - _Boundary: window_pick_
   - _Requirements: 2.1, 2.4_
 
-- [ ] 3. ポートと撮影後フロー
-- [ ] 3.1 エラー型・撮影セッション・2 つのポートとテスト用フェイク
+- [x] 3. ポートと撮影後フロー
+- [x] 3.1 エラー型・撮影セッション・2 つのポートとテスト用フェイク
   - 撮影エラー(構成変化、凍結失敗、ウィンドウ撮影失敗、オーバーレイ利用不可、古いセッション、内部エラー)と確定エラー(小さすぎる、強調中ウィンドウなし、古いセッション、構成変化)を定義する
   - 単調増加するセッション ID と、メモリ内のみで保持する撮影セッション(凍結フレーム、候補一覧、強調中候補、構成指紋、開始時刻、凍結時刻)を定義する
   - OS 撮影ポート(構成取得、カーソル位置、全モニタ凍結、ウィンドウ列挙、ウィンドウ撮影)と画面表示ポート(構築、範囲表示、ウィンドウ選択表示、強調、全非表示、自身のウィンドウ一覧)を定義する
@@ -62,7 +62,7 @@
   - 完了時: フェイクを使った最小のテストがコンパイル・実行でき、純粋モジュールが Tauri と `windows` crate を import していない
   - _Requirements: 1.1, 2.6, 4.3_
 
-- [ ] 3.2 (P) 撮影後フロー(コピー → 保存 → 編集)
+- [x] 3.2 (P) 撮影後フロー(コピー → 保存 → 編集)
   - 確定した画像をまずクリップボードへコピーし(PNG は渡さない)、失敗した場合は「クリップボードへのコピーに失敗しました」を通知して続行する
   - 画像(RGBA のまま、画素はコピーせず移す)と撮影情報(撮影方法、日時、ウィンドウキャプチャの場合のみタイトル)の保存を要求する
   - 保存に成功したらその ID、失敗した場合は保持された未保存アイテムの ID で編集画面を開くよう要求する。保存失敗の通知は capture-library に任せ、重ねて通知しない
@@ -308,3 +308,5 @@
 - 2.2: ローカル ⇔ グローバルの変換は、設計の `geometry::to_global(&MonitorInfo, ..)` ではなく `MonitorInfo::to_global` / `to_local` / `point_to_local` に置いた(geometry → topology の依存方向を保つため)。`MonitorTopology::new` が上・左の昇順に並べて `index` を振り直す。指紋はプロセス内で比較するだけなので `DefaultHasher`。
 - 2.3: 拡大鏡の画素片 `patch` は `compose_region` の特別な場合(半径は `MAX_PATCH_RADIUS` = 16 に丸める)。行が足りない凍結フレームは panic せず、その部分を透明にする。
 - 2.4: OS から読んだ状態を `TopLevelWindow` で受け取り、`candidates` が除外規則(非表示・最小化・クローク・空矩形・Snipt 自身・`Progman` / `WorkerW` / `Shell_TrayWnd` / `Shell_SecondaryTrayWnd`)を適用して z を最前面から 0 で振る。
+- 3.1: `CaptureError::GrabFailed` は設計の `source: windows::core::Error` ではなく `reason: String` を持つ(純粋側を `windows` crate から切り離し、Linux でもビルドできるようにするため)。`CommitError` は `{ "kind": "tooSmall" }` 形式で直列化する。フェイクは `ports::fake` の `FakePlatform` / `FakePresenter`(呼び出しを文字列で記録し、`grab_error` / `fail_show` などで失敗を注入)。
+- 3.2: 差し替え口は `CaptureClipboard`(本番は `SystemClipboard`)と `CaptureStore`(`CaptureLibrary` が実装)。確定時刻は `CaptureOutcome::committed_at` で受け取り、コピー・保存・編集要求の経過を 1 行でログに出す(1 秒超過は warn、ウィンドウタイトルは出さない)。コピー失敗の通知は Warning レベル。
