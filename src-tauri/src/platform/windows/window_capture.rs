@@ -3,7 +3,6 @@
 //! do not show.
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
@@ -12,12 +11,10 @@ use std::time::{Duration, Instant};
 use windows::core::{factory, Error, Interface, HRESULT, HSTRING};
 use windows::Foundation::Metadata::ApiInformation;
 use windows::Graphics::Capture::{
-    Direct3D11CaptureFramePool, GraphicsCaptureAccess, GraphicsCaptureAccessKind,
-    GraphicsCaptureItem, GraphicsCaptureSession,
+    Direct3D11CaptureFramePool, GraphicsCaptureItem, GraphicsCaptureSession,
 };
 use windows::Graphics::DirectX::Direct3D11::IDirect3DDevice;
 use windows::Graphics::DirectX::DirectXPixelFormat;
-use windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
 use windows::Win32::Foundation::{ERROR_TIMEOUT, E_FAIL, E_POINTER, HMODULE, HWND, RECT};
 use windows::Win32::Graphics::Direct3D::{
     D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP,
@@ -65,8 +62,6 @@ unsafe impl Send for Devices {}
 
 pub struct WindowCapture {
     devices: Mutex<Option<Devices>>,
-    /// The user allowed captures without the yellow border (Windows 11).
-    borderless: AtomicBool,
 }
 
 impl Default for WindowCapture {
@@ -79,30 +74,15 @@ impl WindowCapture {
     pub fn new() -> Self {
         Self {
             devices: Mutex::new(None),
-            borderless: AtomicBool::new(false),
         }
     }
 
-    /// Asks once for captures without the yellow border, where Windows supports it, and
-    /// logs the answer. Blocks: call it on the capture worker, not the UI thread.
-    pub fn request_borderless(&self) {
-        if !property_present("IsBorderRequired") {
+    /// Logs whether this Windows can capture a window without the yellow border.
+    pub fn log_border_support(&self) {
+        if border_switchable() {
+            log::info!("capture: window captures without the yellow border where allowed");
+        } else {
             log::info!("capture: this Windows always draws the capture border");
-            return;
-        }
-        let status =
-            GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless)
-                .and_then(|operation| operation.join());
-        match status {
-            Ok(status) if status == AppCapabilityAccessStatus::Allowed => {
-                self.borderless.store(true, Ordering::Relaxed);
-                log::info!("capture: borderless window capture allowed");
-            }
-            Ok(status) => log::info!(
-                "capture: borderless window capture not allowed ({})",
-                status.0
-            ),
-            Err(error) => log::warn!("capture: could not ask for borderless capture: {error}"),
         }
     }
 
@@ -124,22 +104,12 @@ impl WindowCapture {
 
     fn capture_wgc(&self, hwnd: isize, deadline: Instant) -> Result<CapturedImage, Error> {
         let devices = self.devices()?;
-        match first_frame(
-            &devices,
-            hwnd,
-            deadline,
-            self.borderless.load(Ordering::Relaxed),
-        ) {
+        match first_frame(&devices, hwnd, deadline) {
             Err(error) if is_device_lost(&error) => {
                 log::warn!("capture: the D3D11 device was lost, recreating it: {error}");
                 *self.lock() = None;
                 let devices = self.devices()?;
-                first_frame(
-                    &devices,
-                    hwnd,
-                    deadline,
-                    self.borderless.load(Ordering::Relaxed),
-                )
+                first_frame(&devices, hwnd, deadline)
             }
             result => result,
         }
@@ -176,6 +146,12 @@ fn property_present(property: &str) -> bool {
 fn cursor_capture_switchable() -> bool {
     static PRESENT: OnceLock<bool> = OnceLock::new();
     *PRESENT.get_or_init(|| property_present("IsCursorCaptureEnabled"))
+}
+
+/// `IsBorderRequired` exists from Windows 11.
+fn border_switchable() -> bool {
+    static PRESENT: OnceLock<bool> = OnceLock::new();
+    *PRESENT.get_or_init(|| property_present("IsBorderRequired"))
 }
 
 /// A hardware device, or WARP where there is none (a remote desktop, a VM).
@@ -222,12 +198,7 @@ fn create_device(driver: D3D_DRIVER_TYPE) -> Result<ID3D11Device, Error> {
 
 /// Starts a capture session on the window, waits until `deadline` for one frame and reads it
 /// back.
-fn first_frame(
-    devices: &Devices,
-    hwnd: isize,
-    deadline: Instant,
-    borderless: bool,
-) -> Result<CapturedImage, Error> {
+fn first_frame(devices: &Devices, hwnd: isize, deadline: Instant) -> Result<CapturedImage, Error> {
     let interop = factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
     // SAFETY: plain call; an invalid window only makes it fail.
     let item: GraphicsCaptureItem = unsafe { interop.CreateForWindow(HWND(hwnd as *mut c_void)) }?;
@@ -242,8 +213,12 @@ fn first_frame(
     if cursor_capture_switchable() {
         session.SetIsCursorCaptureEnabled(false)?;
     }
-    if borderless {
-        session.SetIsBorderRequired(false)?;
+    if border_switchable() {
+        // Without asking first: `GraphicsCaptureAccess::RequestAccessAsync` crashed the process
+        // on a real Windows 11 (26220). Where Windows refuses, the capture keeps the border.
+        if let Err(error) = session.SetIsBorderRequired(false) {
+            log::debug!("capture: the capture border stays: {error}");
+        }
     }
     session.StartCapture()?;
 
@@ -435,9 +410,6 @@ mod tests {
     fn captures_a_covered_window_with_wgc() {
         init();
         let capture = WindowCapture::new();
-        capture.request_borderless();
-        // Where it stops tells which half failed, should the process crash.
-        println!("borderless asked");
         // SAFETY: plain call.
         let hwnd = unsafe { GetForegroundWindow() }.0 as isize;
         let image = capture
