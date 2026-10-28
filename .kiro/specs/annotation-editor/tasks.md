@@ -303,7 +303,7 @@
   - _Requirements: 1.1, 1.4, 1.5_
 
 - [ ] 7. 検証
-- [ ] 7.1 編集画面の Windows 実機 E2E 環境と主要シナリオを用意する
+- [x] 7.1 編集画面の Windows 実機 E2E 環境と主要シナリオを用意する
   - tauri-driver で編集画面を操作できるテスト環境を用意し(app-shell の雛形には含まれないため本 spec で追加)、テスト用キャプチャを保管庫に用意する手順を含める
   - 撮影後に編集画面が前面に開き、同じキャプチャを履歴から開くと既存ウィンドウが前面化し、別キャプチャは別ウィンドウになることを確認する
   - 矢印・四角・マーカー・ぼかし・切り抜き後に Ctrl+C し、貼り付け先の画像サイズが切り抜き範囲と一致することを確認する
@@ -368,3 +368,7 @@
 - 6.2: `services/export-actions.ts` の `copyComposite` / `exportComposite` が失敗理由(文字列)か `null` を返し、`EditorWindow` が理由をエラーバナーに追加する。推奨名は `Snipt_<id>_export.png`(保存フォルダの `Snipt_<id>.png` / `_annotated.png` を上書きしない名前)。
 - 6.3: `hooks/use-close-guard.ts`。ウィンドウ操作は `services/window-port.ts` の `WindowPort`(`onCloseRequested`、`editor://close-request` / `editor://flush-request` の購読、`destroy`)。どの経路でも先に `commitTextEdit` してから `flush` する。利用者のクローズ中に来た 2 回目のクローズは保存を繰り返さない。
 - 6.4: `build.rs` と `lib.rs` の `generate_handler!` に 7 command を追加。`capabilities/editor.json` は `editor-*` に `core:default`・`core:window:allow-destroy`・本 spec の command のみを許可する(他の capability に `allow-editor-*` が無いことをテストで確認)。ラベル振り分けは app-shell の WindowRouter が既に `EditorWindow` を描画している。
+- 7.1: E2E は `e2e/`(WebdriverIO + Vitest、`mise run e2e`)。tauri-driver は `e2e` タスクだけのツールとして mise で入れ、msedgedriver は WebView2 Runtime と同じ版を `e2e/.drivers/` へ取得する。アプリは `e2e` feature 付きデバッグビルドで、設定を `SNIPT_E2E_CONFIG_DIR` から読み、起動時に履歴ウィンドウを開く(Snipt は起動時にウィンドウが無く、tauri-driver が接続できないため)。テスト用キャプチャは `snipt:meta` 付きの単色 PNG を保存先に置いて起動時に取り込ませる。OS 側の操作(本物のキー入力でのホットキー、前面ウィンドウ、WM_CLOSE でのクローズ、クリップボードの画像)は常駐する PowerShell(`e2e/support/desktop.ps1`、STA・UTF-8)で行う。
+- 7.1(E2E で判明・修正): CSP に `connect-src` が無く、ビルド版(埋め込みアセット)では Tauri の IPC(`http://ipc.localhost`)がブロックされて postMessage に切り替わり、バイナリ本文の `editor_save` が「バイナリで送る必要があります」で失敗していた(注釈の自動保存・閉じる時の保存がビルド版で一度も成功しない)。開発モード(devUrl)では CSP が付かないため見えなかった。`tauri.conf.json` の CSP に `connect-src ipc: http://ipc.localhost` を追加した(app-shell の雛形の設定)。
+- 7.1(前面化): ほかのアプリが前面にあるときにホットキーで撮影すると、編集画面が開いても前面のウィンドウが元のアプリのままになることがあった(Windows の前面ロックと考えられる。合成したキー入力で起こしたホットキーでの観察)。2026-10-29 に利用者が実機で確認した: 開発ビルドで、ほかのアプリを前面にした状態から本物のキーボードで Shift+PrintScreen を押すと、編集画面は前面に来る。前面に来ないのは合成したキー入力(keybd_event)の場合に限られるため、E2E は Snipt の履歴ウィンドウを前面にしてから撮影する(確認結果を受けてこの前提のまま完了とした)。前面化のテスト操作で一般的な「Alt を 1 回押す」方法は、キーを離した時に Snipt のウィンドウがメニューモードに入り UI スレッドが止まって WebDriver が固まるため使わず、`AttachThreadInput` を使う。
+- 7.1(capture-library への申し送り): `.snipt` フォルダが無い保存先にある `Snipt_*.png` を起動時に取り込むと、サムネイルの書き出しが「指定されたパスが見つかりません」で失敗する(`LibraryLayout::ensure_dirs` が保存・注釈保存の時にしか呼ばれない)。一覧はプレースホルダ表示になるだけで E2E は通るが、capture-library 側での修正が必要。

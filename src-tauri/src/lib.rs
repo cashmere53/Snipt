@@ -21,6 +21,9 @@ pub fn setup_specs<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::erro
     app_shell::setup(app)?;
     setup_downstream(app)?;
     app_shell::start(app)?;
+    // tauri-driver attaches to the first webview; Snipt otherwise starts with none.
+    #[cfg(feature = "e2e")]
+    app_shell::windows::WindowManager::new(app.handle().clone()).show_history()?;
     Ok(())
 }
 

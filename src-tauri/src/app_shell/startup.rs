@@ -61,11 +61,21 @@ impl Platform {
 
 pub fn setup<R: Runtime>(app: &mut App<R>) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("setup: app-shell (stage 1)");
-    let settings_path = app.path().app_config_dir()?.join("settings.json");
+    let settings_path = config_dir(app.handle())?.join("settings.json");
     let picture_dir = app.path().picture_dir()?;
     let platform = Platform::production(app.handle());
     setup_at(app.handle(), settings_path, &picture_dir, platform);
     Ok(())
+}
+
+/// `%APPDATA%\app.snipt`, or `SNIPT_E2E_CONFIG_DIR` in E2E builds so tests never touch the
+/// user's settings.
+fn config_dir<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<PathBuf> {
+    #[cfg(feature = "e2e")]
+    if let Some(dir) = std::env::var_os("SNIPT_E2E_CONFIG_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
+    app.path().app_config_dir()
 }
 
 /// Stage 1 with explicit paths and OS parts (tests use temporary folders and fakes).

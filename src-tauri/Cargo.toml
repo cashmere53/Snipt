@@ -70,6 +70,11 @@ windows = { version = "0.62", features = [
 # --- screen-capture ---
 # --- annotation-editor ---
 
+[features]
+# Windows E2E builds only (`e2e/`): settings come from `SNIPT_E2E_CONFIG_DIR` and the history
+# window opens at startup so tauri-driver has a webview to attach to.
+e2e = []
+
 [dev-dependencies]
 tauri = { version = "2", features = ["tray-icon", "protocol-asset", "test"] }
 tempfile = "3"

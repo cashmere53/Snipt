@@ -1,3 +1,7 @@
 onlyBuiltDependencies:
   # Prebuilt native binding for the editor tests (jsdom draws canvases with it).
   - canvas
+ignoredBuiltDependencies:
+  # webdriverio's driver downloaders; the E2E setup fetches the msedgedriver matching WebView2.
+  - edgedriver
+  - geckodriver

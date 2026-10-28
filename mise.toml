@@ -37,3 +37,12 @@ run = "cargo test --release --locked --lib capture_library::perf_tests -- --igno
 [tasks.check]
 description = "Run every check that CI runs"
 depends = ["check:web", "check:rust"]
+
+[tasks.e2e]
+description = "Build the E2E app and run the Windows E2E tests (needs a desktop; quit Snipt first)"
+# Only this task needs tauri-driver, so CI and `mise install` do not build it.
+tools = { "cargo:tauri-driver" = "2.1.0" }
+# Its own target folder: the tests can never start a build without the feature (which would
+# use the real settings), and `mise run dev` keeps its binary.
+env = { CARGO_TARGET_DIR = "{{config_root}}/src-tauri/target/e2e" }
+run = ["pnpm tauri build --debug --no-bundle --features e2e", "pnpm test:e2e"]
