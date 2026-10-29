@@ -248,3 +248,28 @@ export function savedDocument(saveDir: string, id: string): SavedDocument | null
     return null;
   }
 }
+
+/**
+ * Reads the annotations file every few milliseconds and keeps the last document seen, and when
+ * the file was first seen. A file that is written and then moved away (to the recycle bin) is
+ * still caught.
+ */
+export function watchAnnotations(
+  saveDir: string,
+  id: string,
+): { latest(): SavedDocument | null; firstSeenAt(): number | null; stop(): void } {
+  let latest: SavedDocument | null = null;
+  let firstSeen: number | null = null;
+  const timer = setInterval(() => {
+    const doc = savedDocument(saveDir, id);
+    if (doc !== null && firstSeen === null) {
+      firstSeen = Date.now();
+    }
+    latest = doc ?? latest;
+  }, 5);
+  return {
+    latest: () => latest,
+    firstSeenAt: () => firstSeen,
+    stop: () => clearInterval(timer),
+  };
+}

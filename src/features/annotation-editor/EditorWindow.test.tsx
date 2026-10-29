@@ -133,4 +133,51 @@ describe("EditorWindow", () => {
     fireEvent.click(screen.getByRole("button", { name: "変更を破棄して閉じる" }));
     await waitFor(() => expect(f.window.port.destroy).toHaveBeenCalledOnce());
   });
+
+  describe("before the session opens", () => {
+    it("answers a flush request at once with nothing to save, when the capture failed to open", async () => {
+      const f = setup(fakeIpc({ openSession: async () => fail("notFound", "見つかりません") }));
+      await screen.findByText("見つかりません");
+      await waitFor(() => expect(f.window.listening()).toBe(true));
+      f.window.flushRequest("r1");
+      await waitFor(() => expect(f.ipc.flushResult).toHaveBeenCalledWith("r1", true));
+      expect(f.window.port.destroy).not.toHaveBeenCalled();
+    });
+
+    it("destroys itself on the close request when the capture failed to open", async () => {
+      const f = setup(fakeIpc({ openSession: async () => fail("notFound", "見つかりません") }));
+      await screen.findByText("見つかりません");
+      await waitFor(() => expect(f.window.listening()).toBe(true));
+      f.window.closeRequest();
+      await waitFor(() => expect(f.window.port.destroy).toHaveBeenCalledOnce());
+      expect(f.ipc.save).not.toHaveBeenCalled();
+    });
+
+    it("lets the user's close go through at once when the capture failed to open", async () => {
+      const f = setup(fakeIpc({ openSession: async () => fail("notFound", "見つかりません") }));
+      await screen.findByText("見つかりません");
+      await waitFor(() => expect(f.window.listening()).toBe(true));
+      expect(f.window.userClose()).toBe(true);
+      await waitFor(() => expect(f.window.port.destroy).toHaveBeenCalledOnce());
+    });
+
+    it("answers a flush request and a close request while the capture is still loading", async () => {
+      const f = setup(fakeIpc({ openSession: () => new Promise(() => {}) }));
+      await waitFor(() => expect(f.window.listening()).toBe(true));
+      f.window.flushRequest("r1");
+      await waitFor(() => expect(f.ipc.flushResult).toHaveBeenCalledWith("r1", true));
+      f.window.closeRequest();
+      await waitFor(() => expect(f.window.port.destroy).toHaveBeenCalledOnce());
+    });
+
+    it("hands the requests to the session once it opens, with one subscription each", async () => {
+      const f = setup();
+      await ready();
+      await waitFor(() => expect(f.window.listening()).toBe(true));
+      expect(f.window.subscriptions()).toBe(3);
+      f.window.flushRequest("r1");
+      await waitFor(() => expect(f.ipc.flushResult).toHaveBeenCalledWith("r1", true));
+      expect(f.ipc.flushResult).toHaveBeenCalledOnce();
+    });
+  });
 });

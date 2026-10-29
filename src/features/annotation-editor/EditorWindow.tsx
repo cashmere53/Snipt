@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EditorCanvas } from "./canvas/EditorCanvas";
 import { useCloseGuard } from "./hooks/use-close-guard";
+import { useIdleCloseGuard } from "./hooks/use-idle-close-guard";
 import { useShortcuts } from "./hooks/use-shortcuts";
 import type { AnnotationDocument } from "./model/document";
 import { createAutosave } from "./services/autosave";
@@ -54,6 +55,7 @@ export function EditorWindow({
 }) {
   const deps = useMemo(() => given ?? defaultDeps(), [given]);
   const [loading, setLoading] = useState<Loading>({ kind: "loading" });
+  const [port] = useState(deps.windowPort);
 
   useEffect(() => {
     let current = true;
@@ -64,6 +66,13 @@ export function EditorWindow({
       current = false;
     };
   }, [deps]);
+
+  // Until the session mounts, nothing is unsaved: the requests are answered here.
+  useIdleCloseGuard({
+    active: loading.kind === "loading" || !loading.loaded.ok,
+    port,
+    flushResult: deps.ipc.flushResult,
+  });
 
   if (loading.kind === "loading") {
     return <main className="editor" data-testid="EditorWindow" aria-busy="true" />;

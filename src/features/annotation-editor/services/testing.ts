@@ -49,24 +49,25 @@ export function fakeIpc(overrides: Partial<EditorIpc> = {}) {
   return ipc;
 }
 
-/** A window whose handlers the test fires by hand. */
+/** Subscribes `handler` to a set of live handlers; unlisten removes only that handler. */
+function listen<T>(live: Set<T>): (handler: T) => Promise<() => void> {
+  return async (handler) => {
+    live.add(handler);
+    return () => void live.delete(handler);
+  };
+}
+
+/** A window whose handlers the test fires by hand, like Tauri: every live handler gets each event. */
 export function fakePort() {
-  let closeRequested: ((event: { preventDefault(): void }) => void) | null = null;
-  let closeRequest: (() => void) | null = null;
-  let flushRequest: ((payload: FlushRequestPayload) => void) | null = null;
+  const live = {
+    closeRequested: new Set<(event: { preventDefault(): void }) => void>(),
+    closeRequest: new Set<() => void>(),
+    flushRequest: new Set<(payload: FlushRequestPayload) => void>(),
+  };
   const port = {
-    onCloseRequested: vi.fn<WindowPort["onCloseRequested"]>(async (handler) => {
-      closeRequested = handler;
-      return () => (closeRequested = null);
-    }),
-    onCloseRequest: vi.fn<WindowPort["onCloseRequest"]>(async (handler) => {
-      closeRequest = handler;
-      return () => (closeRequest = null);
-    }),
-    onFlushRequest: vi.fn<WindowPort["onFlushRequest"]>(async (handler) => {
-      flushRequest = handler;
-      return () => (flushRequest = null);
-    }),
+    onCloseRequested: vi.fn<WindowPort["onCloseRequested"]>(listen(live.closeRequested)),
+    onCloseRequest: vi.fn<WindowPort["onCloseRequest"]>(listen(live.closeRequest)),
+    onFlushRequest: vi.fn<WindowPort["onFlushRequest"]>(listen(live.flushRequest)),
     destroy: vi.fn<WindowPort["destroy"]>(async () => {}),
   };
   return {
@@ -74,11 +75,20 @@ export function fakePort() {
     /** The user closes the window; returns whether the close was stopped. */
     userClose() {
       let prevented = false;
-      closeRequested?.({ preventDefault: () => (prevented = true) });
+      for (const handler of live.closeRequested) {
+        handler({ preventDefault: () => (prevented = true) });
+      }
       return prevented;
     },
-    closeRequest: () => closeRequest?.(),
-    flushRequest: (requestId: string) => flushRequest?.({ requestId }),
-    listening: () => closeRequested !== null && closeRequest !== null && flushRequest !== null,
+    closeRequest: () => {
+      for (const handler of live.closeRequest) handler();
+    },
+    flushRequest: (requestId: string) => {
+      for (const handler of live.flushRequest) handler({ requestId });
+    },
+    listening: () =>
+      live.closeRequested.size > 0 && live.closeRequest.size > 0 && live.flushRequest.size > 0,
+    /** How many handlers are subscribed: one of each kind, never two. */
+    subscriptions: () => live.closeRequested.size + live.closeRequest.size + live.flushRequest.size,
   };
 }

@@ -181,10 +181,23 @@ pub fn on_shortcut<R: Runtime>(app: &AppHandle<R>, shortcut: &Shortcut, event: S
 /// The single-instance plugin callback, run in the first instance.
 pub fn on_second_instance<R: Runtime>(app: &AppHandle<R>, argv: &[String]) {
     log::info!("second instance started: {argv:?}");
+    // E2E only: the tests cannot reach the tray's 終了, so a second launch asks the running
+    // instance to quit through the same `Lifecycle::quit` as the tray does.
+    #[cfg(feature = "e2e")]
+    if argv.iter().any(|arg| arg == E2E_QUIT_ARG) {
+        if let Some(lifecycle) = app.try_state::<Arc<Lifecycle>>() {
+            lifecycle.quit();
+        }
+        return;
+    }
     if let Some(lifecycle) = app.try_state::<Arc<Lifecycle>>() {
         lifecycle.on_second_instance();
     }
 }
+
+/// The argument a second launch passes to quit the running E2E build (see `on_second_instance`).
+#[cfg(feature = "e2e")]
+pub const E2E_QUIT_ARG: &str = "--e2e-quit";
 
 /// Notices shown once startup is done: settings reset (4.3), failed hotkeys merged into one
 /// (2.3, 2.4) and an autostart sync failure.

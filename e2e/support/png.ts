@@ -1,5 +1,6 @@
-// Test captures for the save folder: a solid RGBA PNG with Snipt's `snipt:meta` iTXt chunk
-// right after IHDR, as capture-library writes originals (src-tauri/src/capture_library/png_meta.rs).
+// Test captures for the save folder: an RGBA PNG (solid, or a per-pixel gradient) with Snipt's
+// `snipt:meta` iTXt chunk right after IHDR, as capture-library writes originals
+// (src-tauri/src/capture_library/png_meta.rs).
 import { crc32, deflateSync } from "node:zlib";
 
 export interface SeedCapture {
@@ -10,6 +11,12 @@ export interface SeedCapture {
   width: number;
   height: number;
   rgba: readonly [number, number, number, number];
+  /**
+   * `gradient` changes colour in blocks of 32 × 64 px: the PNG has real content, yet compresses far
+   * better than a per-pixel gradient, so the capture library's thumbnail of it stays fast in a debug
+   * build. Default `solid`.
+   */
+  pattern?: "solid" | "gradient";
 }
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -46,11 +53,23 @@ export function seedPng(capture: SeedCapture): Buffer {
     Buffer.from(meta, "utf8"),
   ]);
 
-  const row = Buffer.alloc(1 + width * 4);
-  for (let x = 0; x < width; x++) {
-    row.set(rgba, 1 + x * 4);
+  const rowBytes = 1 + width * 4;
+  const raw = Buffer.alloc(height * rowBytes);
+  for (let y = 0; y < height; y++) {
+    // filter type 0 (none) at the start of each row
+    const start = y * rowBytes;
+    for (let x = 0; x < width; x++) {
+      const at = start + 1 + x * 4;
+      if (capture.pattern === "gradient") {
+        raw[at] = (x >> 5) & 0xff;
+        raw[at + 1] = (y >> 6) & 0xff;
+        raw[at + 2] = ((x >> 5) + (y >> 6)) & 0xff;
+        raw[at + 3] = 255;
+      } else {
+        raw.set(rgba, at);
+      }
+    }
   }
-  const raw = Buffer.concat(Array.from({ length: height }, () => row));
 
   return Buffer.concat([
     SIGNATURE,

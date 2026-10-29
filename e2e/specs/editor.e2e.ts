@@ -19,7 +19,7 @@ import {
   windowTitle,
 } from "../support/app";
 import { Desktop } from "../support/desktop";
-import { HOTKEYS, type Session, startSession } from "../support/driver";
+import { abortSessionStart, HOTKEYS, type Session, startSession } from "../support/driver";
 import { editorTitle, type SeedCapture } from "../support/png";
 
 const GRAY: SeedCapture = {
@@ -78,6 +78,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await abortSessionStart();
   desktop?.dispose();
   await session?.close();
 });
