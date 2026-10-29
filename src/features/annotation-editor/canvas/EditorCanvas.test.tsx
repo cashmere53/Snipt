@@ -99,6 +99,27 @@ describe("EditorCanvas", () => {
     expect(shapes(f)).toHaveLength(2);
   });
 
+  it("keeps the focus on a text box opened by a click, but not for markers", () => {
+    const f = renderCanvas();
+    // Whether the mousedown's default action (moving the focus) was cancelled by the stage.
+    const defaultPrevented = (tool: "text" | "marker", at: { x: number; y: number }) => {
+      act(() => f.state().setTool(tool));
+      let prevented = false;
+      const listen = (e: Event) => {
+        prevented = e.defaultPrevented;
+      };
+      f.stage.content.addEventListener("mousedown", listen);
+      // The events are cancelable, as a real mouse press is.
+      f.down(at, { cancelable: true });
+      f.stage.content.removeEventListener("mousedown", listen);
+      return prevented;
+    };
+
+    expect(defaultPrevented("text", { x: 30, y: 40 })).toBe(true);
+    act(() => f.state().commitTextEdit());
+    expect(defaultPrevented("marker", { x: 100, y: 100 })).toBe(false);
+  });
+
   it("sets the crop draft by dragging with the crop tool", () => {
     const f = renderCanvas();
     act(() => f.state().setTool("crop"));

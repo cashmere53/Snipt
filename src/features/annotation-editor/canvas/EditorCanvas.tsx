@@ -219,6 +219,9 @@ export function EditorCanvas() {
     }
     if (!insideImage(at, currentDoc(state))) return;
     if (state.tool === "text") {
+      // The box takes focus during this mousedown. The browser's default action would then move
+      // focus off the canvas and blur the box at once, which closes it empty.
+      evt.preventDefault();
       state.beginTextEdit({ position: at });
     } else if (state.tool === "marker") {
       const current = currentDoc(state);
