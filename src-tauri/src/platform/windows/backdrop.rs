@@ -110,6 +110,11 @@ impl OverlayNative for WinOverlayNative {
         }
     }
 
+    fn hide_overlay(&self, hwnd: isize) {
+        // SAFETY: hiding a window is allowed from any thread.
+        let _ = unsafe { ShowWindow(handle(hwnd), SW_HIDE) };
+    }
+
     fn rebuild_backdrops(&self, topology: &MonitorTopology) -> Result<(), CaptureError> {
         let old: Vec<isize> = self.backdrops().iter().map(|b| b.hwnd).collect();
         let monitors: Vec<(MonitorIndex, PhysicalRect)> = topology
