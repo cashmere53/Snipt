@@ -7,6 +7,8 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
 Add-Type @'
 using System;
 using System.Collections.Generic;
@@ -101,6 +103,37 @@ function Read-ClipboardImage($points) {
     return $result
 }
 
+# A top-level window by its title, as UI Automation sees it (native dialogs such as the exit
+# confirmation included). Null when there is none.
+function Find-TopWindow($title) {
+    $condition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $title)
+    return [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children, $condition)
+}
+
+# The texts of a window's controls, one per line. Null when there is no such window.
+function Read-WindowText($title) {
+    $window = Find-TopWindow $title
+    if ($null -eq $window) { return $null }
+    $names = [System.Collections.Generic.List[string]]::new()
+    $all = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($element in $all) {
+        $name = $element.Current.Name
+        if (-not [string]::IsNullOrEmpty($name)) { $names.Add($name) }
+    }
+    return ($names -join "`n")
+}
+
+# Presses the button with the given text in a window. False when the window or button is missing.
+function Invoke-WindowButton($title, $label) {
+    $window = Find-TopWindow $title
+    if ($null -eq $window) { return $false }
+    $condition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $label)
+    $button = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    if ($null -eq $button) { return $false }
+    $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    return $true
+}
+
 while ($null -ne ($line = [Console]::In.ReadLine())) {
     try {
         $cmd = $line | ConvertFrom-Json
@@ -112,6 +145,8 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
             'exists' { [SniptE2e]::Find($cmd.title).Count -gt 0 }
             'clipboardClear' { [System.Windows.Forms.Clipboard]::Clear(); $true }
             'clipboardImage' { Read-ClipboardImage $cmd.points }
+            'windowText' { Read-WindowText $cmd.title }
+            'invokeButton' { Invoke-WindowButton $cmd.title $cmd.label }
             default { throw "unknown op: $($cmd.op)" }
         }
         [Console]::Out.WriteLine((@{ ok = $true; value = $value } | ConvertTo-Json -Compress -Depth 6))

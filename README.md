@@ -108,6 +108,7 @@ mise run e2e   # E2E 用ビルド(--features e2e)→ テスト実行
 - E2E 用ビルドは `e2e` feature 付きのデバッグビルド(出力先は `src-tauri/target/e2e/`)で、通常のビルドとは次の 2 点が違います。設定を `SNIPT_E2E_CONFIG_DIR` から読むこと、起動時に履歴ウィンドウを開くこと(tauri-driver が接続するため)です。利用者の設定・保存フォルダ・WebView2 のデータには触れません。
 - テスト用キャプチャは、一時フォルダの保存先へ `Snipt_<id>.png`(`snipt:meta` 付きの単色 PNG、`e2e/support/png.ts`)として置きます。起動時に履歴へ取り込まれます。テスト用の設定は撮影ホットキーを `Ctrl+Alt+Shift+F7` / `F8` / `F9` にしています。
 - `SNIPT_E2E_KEEP=1` を付けると、終了後も一時フォルダ(設定・保存先・WebView2 のデータ)を残します。
+- 終了の E2E は、起動中のアプリへ `snipt.exe --e2e-quit` を渡すと、トレイの「終了」と同じ経路で終了します(E2E 用ビルドだけの動作。トレイのメニューは操作できないため)。終了確認は Windows の UI Automation で読み、ボタンを押します。
 
 ### ディレクトリ構成
 

@@ -312,7 +312,7 @@
   - _Depends: 6.4, capture-library: HistoryWindow, screen-capture: PostCaptureFlow_
   - _Requirements: 1.1, 1.4, 1.5, 10.1, 10.3, 11.2_
 
-- [ ] 7.2 日本語入力・削除前クローズ・アプリ終了時の flush を検証する
+- [x] 7.2 日本語入力・削除前クローズ・アプリ終了時の flush を検証する
   - テキストツールで IME 変換中の Esc で確定されず、外側クリックで確定されることを確認する
   - 履歴から開いている画像を削除すると、未保存の注釈が flush されてから編集画面が閉じることを確認する
   - 保存に失敗する状態でアプリを終了すると、終了確認に「注釈: <ID>」が表示され、再試行で保存されることを確認する
@@ -372,3 +372,6 @@
 - 7.1(E2E で判明・修正): CSP に `connect-src` が無く、ビルド版(埋め込みアセット)では Tauri の IPC(`http://ipc.localhost`)がブロックされて postMessage に切り替わり、バイナリ本文の `editor_save` が「バイナリで送る必要があります」で失敗していた(注釈の自動保存・閉じる時の保存がビルド版で一度も成功しない)。開発モード(devUrl)では CSP が付かないため見えなかった。`tauri.conf.json` の CSP に `connect-src ipc: http://ipc.localhost` を追加した(app-shell の雛形の設定)。
 - 7.1(前面化): ほかのアプリが前面にあるときにホットキーで撮影すると、編集画面が開いても前面のウィンドウが元のアプリのままになることがあった(Windows の前面ロックと考えられる。合成したキー入力で起こしたホットキーでの観察)。2026-10-29 に利用者が実機で確認した: 開発ビルドで、ほかのアプリを前面にした状態から本物のキーボードで Shift+PrintScreen を押すと、編集画面は前面に来る。前面に来ないのは合成したキー入力(keybd_event)の場合に限られるため、E2E は Snipt の履歴ウィンドウを前面にしてから撮影する(確認結果を受けてこの前提のまま完了とした)。前面化のテスト操作で一般的な「Alt を 1 回押す」方法は、キーを離した時に Snipt のウィンドウがメニューモードに入り UI スレッドが止まって WebDriver が固まるため使わず、`AttachThreadInput` を使う。
 - 7.1(capture-library への申し送り): `.snipt` フォルダが無い保存先にある `Snipt_*.png` を起動時に取り込むと、サムネイルの書き出しが「指定されたパスが見つかりません」で失敗する(`LibraryLayout::ensure_dirs` が保存・注釈保存の時にしか呼ばれない)。一覧はプレースホルダ表示になるだけで E2E は通るが、capture-library 側での修正が必要。
+- 7.2: シナリオは `e2e/specs/editor-flush.e2e.ts`。IME の変換は本物の IME ではなく CDP の `Input.imeSetComposition`(msedgedriver の `/ms/cdp/execute`)で起こし、Esc が `isComposing` のままページに届いたことを keydown の記録で確かめる。削除のシナリオは一時フォルダのファイルをごみ箱へ移す。保存失敗は注釈 JSON のパスにフォルダを置いて起こし、終了は `e2e` feature の時だけ有効な 2 つ目のインスタンス引数 `--e2e-quit`(app-shell の `on_second_instance` → `Lifecycle::quit`)で要求する。
+- 7.2(E2E で判明・修正): テキストツールのクリックで開いた入力欄が、mousedown の既定動作でフォーカスを失い即座に閉じていた(テキスト注釈を一度も入力できない)。`EditorCanvas` のテキストツールの mousedown で `preventDefault` してから入力を始める(単体テストあり)。
+- 7.2(E2E の起動): `listen(0)` で選んだポートは Windows の動的ポート範囲(この環境では 1024〜14999)から選ばれ、ほかのプロセスに先に取られることがあった。WebDriver のポートが取られていると tauri-driver は `can not listen to address` を出して終了コード 0 で終わり、ネイティブ側のポートが取られていると msedgedriver が `bind()` エラーを出す。ポートは 20000〜45000 から無作為に選んで直前に bind を確かめ、stderr にこれらが出た試行は捨てて新しいポートで最大 5 回やり直す。失敗時と終了時は `taskkill /T` とポート指定のコマンドラインで tauri-driver / msedgedriver を確実に止める。起動できた試行は `E2E: session started (attempt N/5, ...)` を出す。

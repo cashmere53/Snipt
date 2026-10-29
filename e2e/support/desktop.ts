@@ -75,6 +75,16 @@ export class Desktop {
     return this.call({ op: "exists", title });
   }
 
+  /** The texts of a window's controls, one per line; `null` when no such window is open. */
+  windowText(title: string): Promise<string | null> {
+    return this.call({ op: "windowText", title });
+  }
+
+  /** Presses the button labelled `label` in a window (a native dialog's, too). */
+  invokeButton(title: string, label: string): Promise<boolean> {
+    return this.call({ op: "invokeButton", title, label });
+  }
+
   clearClipboard(): Promise<boolean> {
     return this.call({ op: "clipboardClear" });
   }
