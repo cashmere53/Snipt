@@ -212,6 +212,106 @@ function killByPorts(webdriverPort: number, nativePort: number): void {
   );
 }
 
+interface DriverProcess {
+  pid: number;
+  parent: number;
+  name: string;
+  path: string;
+  commandLine: string;
+  /** Started by this harness: an msedgedriver from `e2e/.drivers`, or a tauri-driver given one. */
+  harness: boolean;
+}
+
+const DRIVERS_LOWER = DRIVERS.toLowerCase();
+
+/** The tauri-driver and msedgedriver processes on the machine, with parents and command lines. */
+function driverProcesses(): DriverProcess[] {
+  const out = powershell(
+    `Get-CimInstance Win32_Process | Where-Object { $_.Name -in 'tauri-driver.exe','msedgedriver.exe' } | ` +
+      `ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.ExecutablePath)|` +
+      `$(($_.CommandLine -replace '\\s+',' '))" }`,
+  );
+  if (out === "") {
+    return [];
+  }
+  return out.split(/\r?\n/).map((line) => {
+    const [pid, parent, name = "", path = "", ...rest] = line.split("|");
+    const commandLine = rest.join("|");
+    const harness =
+      name.toLowerCase() === "msedgedriver.exe"
+        ? path.toLowerCase().startsWith(DRIVERS_LOWER)
+        : commandLine.toLowerCase().includes(DRIVERS_LOWER);
+    return { pid: Number(pid), parent: Number(parent), name, path, commandLine, harness };
+  });
+}
+
+/**
+ * Writes the driver processes and the owners of the two ports, so a duplicate tauri-driver or a
+ * port holder shows in the log. Never throws: it only describes.
+ */
+function diagnose(label: string, ports: readonly number[]): void {
+  try {
+    const procs = driverProcesses();
+    const lines = procs.map(
+      (p) =>
+        `  pid ${p.pid} parent ${p.parent} ${p.name} harness=${p.harness} exe=${p.path}\n` +
+        `    cmd: ${p.commandLine}`,
+    );
+    const owners = powershell(
+      `netstat -ano -p tcp | Select-String -Pattern ':(${ports.join("|")})\\s' | ForEach-Object { ` +
+        `$cols = @($_.Line.Trim() -split '\\s+'); $owner = $cols[-1]; ` +
+        `$name = (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName; ` +
+        `"$($cols -join ' ') owner=$owner($name)" }`,
+    );
+    process.stderr.write(
+      `E2E diag (${label}): ${procs.length} tauri-driver/msedgedriver process(es)\n` +
+        `${lines.join("\n")}${lines.length > 0 ? "\n" : ""}` +
+        `  ports ${ports.join(", ")} (netstat):\n` +
+        `${
+          owners === ""
+            ? "    (no owner)"
+            : owners
+                .split(/\r?\n/)
+                .map((l) => `    ${l}`)
+                .join("\n")
+        }\n`,
+    );
+  } catch (e) {
+    process.stderr.write(`E2E diag (${label}) failed: ${String(e)}\n`);
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Before an attempt, no driver this harness started may still be alive, so the attempt's ports and
+ * tauri-driver are its own. Waits up to 5 s for earlier ones to exit, then stops any left.
+ * It matches by path, not by parent, so it also stops a concurrent run's harness drivers: only one
+ * `mise run e2e` at a time is supported.
+ */
+async function clearHarnessDrivers(): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  let alive = driverProcesses().filter((p) => p.harness);
+  while (alive.length > 0 && Date.now() < deadline) {
+    await sleep(250);
+    alive = driverProcesses().filter((p) => p.harness);
+  }
+  if (alive.length === 0) {
+    return;
+  }
+  process.stderr.write(
+    `E2E: ${alive.length} driver process(es) from an earlier start still alive after 5 s, stopping: ` +
+      `${alive.map((p) => `${p.name} pid ${p.pid} parent ${p.parent}`).join(", ")}\n`,
+  );
+  for (const p of alive) {
+    try {
+      execFileSync("taskkill", ["/PID", String(p.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      // already gone
+    }
+  }
+}
+
 /**
  * Waits for the driver to answer. Checks `failure` first on every round, so a driver that cannot
  * serve (a port taken, a process exited) fails at once, even when another process answers HTTP on
@@ -245,12 +345,42 @@ export interface Session {
   close(): Promise<void>;
 }
 
+/** The tauri-driver processes this module started and has not stopped (an attempt's, or a session's). */
+const running = new Set<ChildProcess>();
+/** The start in progress, so an abandoned start can be waited for (see `abortSessionStart`). */
+let inFlight: Promise<Session> | null = null;
+/** Set by `abortSessionStart`: no further attempt starts, and the current one stops. */
+let startAborted = false;
+/** Set once a session has been handed out: its owner closes it, and `abortSessionStart` leaves it alone. */
+let sessionStarted = false;
+// Module-level state is safe here: vitest isolates modules per test file, so each spec file has its own.
+
+/**
+ * Stops a start that vitest has abandoned (a `beforeAll` that timed out while the start went on in
+ * the background) and waits for it to clean up, so it cannot start drivers after the next file has
+ * begun. A no-op once a session has started: the session's `close()` stops its own drivers, and
+ * this must not kill them first. Call it from `afterAll`, before `session?.close()`.
+ */
+export async function abortSessionStart(): Promise<void> {
+  if (sessionStarted) {
+    return;
+  }
+  startAborted = true;
+  for (const child of running) {
+    killTree(child);
+  }
+  await inFlight?.catch(() => undefined);
+}
+
 /** One attempt: tauri-driver on fresh ports, then a WebDriver session on the E2E build. */
 async function startOnce(
   workspace: Workspace,
   edgeDriver: string,
   attempt: number,
 ): Promise<Session> {
+  if (startAborted) {
+    throw new Error("session start aborted");
+  }
   const webdriverPort = await freePort();
   let nativePort = await freePort();
   while (nativePort === webdriverPort) {
@@ -295,8 +425,9 @@ async function startOnce(
   tauriDriver.once("exit", (code) => {
     state.exited = true;
     state.code = code ?? -1;
+    running.delete(tauriDriver);
     if (!state.stopping) {
-      console.error(`tauri-driver exited early (code ${code})`);
+      process.stderr.write(`E2E: tauri-driver exited early (code ${code})\n`);
     }
   });
   await new Promise<void>((resolve, reject) => {
@@ -305,7 +436,9 @@ async function startOnce(
       reject(new Error(`tauri-driver を起動できません(mise run e2e で実行してください): ${e}`)),
     );
   });
+  running.add(tauriDriver);
   const failure = (): string | null => {
+    if (startAborted) return "session start aborted";
     if (state.taken !== null) return `port in use: ${state.taken}`;
     if (state.exited) return `exited with code ${state.code}`;
     return null;
@@ -339,10 +472,16 @@ async function startOnce(
     }
   } catch (e) {
     const reason = failure();
+    // Before anything is killed, so the log shows the drivers as they were.
+    diagnose(`attempt ${attempt} pid ${tauriDriver.pid} failed: ${reason ?? String(e)}`, [
+      webdriverPort,
+      nativePort,
+    ]);
     state.stopping = true;
     killTree(tauriDriver);
     killByPorts(webdriverPort, nativePort);
     killApp();
+    running.delete(tauriDriver);
     if (reason === null) {
       throw e;
     }
@@ -354,6 +493,7 @@ async function startOnce(
   process.stderr.write(
     `E2E: session started (attempt ${attempt}/${START_ATTEMPTS}, 127.0.0.1:${webdriverPort}/${nativePort})\n`,
   );
+  diagnose(`attempt ${attempt} pid ${tauriDriver.pid} started`, [webdriverPort, nativePort]);
   return {
     browser,
     workspace,
@@ -366,6 +506,7 @@ async function startOnce(
       });
       killTree(tauriDriver);
       await exited;
+      running.delete(tauriDriver);
       killByPorts(webdriverPort, nativePort);
       killApp();
       if (process.env.SNIPT_E2E_KEEP !== "1") {
@@ -375,7 +516,7 @@ async function startOnce(
   };
 }
 
-export async function startSession(captures: readonly SeedCapture[]): Promise<Session> {
+async function startSessionAttempts(captures: readonly SeedCapture[]): Promise<Session> {
   if (!existsSync(APP)) {
     throw new Error(`${APP} がありません。mise run e2e で実行してください`);
   }
@@ -384,16 +525,37 @@ export async function startSession(captures: readonly SeedCapture[]): Promise<Se
   const workspace = createWorkspace(captures);
   let failure: unknown = null;
   for (let attempt = 1; attempt <= START_ATTEMPTS; attempt++) {
+    if (startAborted) {
+      break;
+    }
+    // One attempt at a time: an earlier attempt's drivers must be gone before this one listens.
+    await clearHarnessDrivers();
     try {
       return await startOnce(workspace, edgeDriver, attempt);
     } catch (e) {
       failure = e;
       // The failed attempt's processes are gone (`startOnce` kills them); start over.
-      console.error(`E2E: session start ${attempt}/${START_ATTEMPTS} failed: ${String(e)}`);
+      process.stderr.write(
+        `E2E: session start ${attempt}/${START_ATTEMPTS} failed: ${String(e)}\n`,
+      );
     }
   }
   if (process.env.SNIPT_E2E_KEEP !== "1") {
     rmSync(workspace.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
   }
-  throw failure;
+  throw failure ?? new Error("session start aborted");
+}
+
+/** Starts the drivers and a session. One start at a time per module (see `abortSessionStart`). */
+export function startSession(captures: readonly SeedCapture[]): Promise<Session> {
+  inFlight = startSessionAttempts(captures).then(async (session) => {
+    if (startAborted) {
+      // Abandoned while starting: nobody will close it, so close it here.
+      await session.close();
+      throw new Error("session start aborted");
+    }
+    sessionStarted = true;
+    return session;
+  });
+  return inFlight;
 }

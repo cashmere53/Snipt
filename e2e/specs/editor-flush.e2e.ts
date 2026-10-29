@@ -20,7 +20,14 @@ import {
   watchAnnotations,
 } from "../support/app";
 import { Desktop } from "../support/desktop";
-import { appRunning, requestQuit, type Session, sendCdp, startSession } from "../support/driver";
+import {
+  abortSessionStart,
+  appRunning,
+  requestQuit,
+  type Session,
+  sendCdp,
+  startSession,
+} from "../support/driver";
 import { editorTitle, type SeedCapture } from "../support/png";
 
 const TEXT: SeedCapture = {
@@ -111,6 +118,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await abortSessionStart();
   desktop?.dispose();
   await session?.close();
 });
