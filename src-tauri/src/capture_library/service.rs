@@ -101,6 +101,20 @@ fn layout_of(item: &CaptureItem) -> LibraryLayout {
     )
 }
 
+/// Creates `.snipt` in an existing folder before it is imported. The cache and every thumbnail
+/// of an imported folder are written there, while only the save path used to create it. A
+/// folder that does not exist yet is left to the first save.
+fn prepare_import(layout: &LibraryLayout) {
+    if layout.root().is_dir() {
+        if let Err(e) = layout.ensure_dirs() {
+            log::warn!(
+                "library: could not prepare {}: {e}",
+                layout.root().display()
+            );
+        }
+    }
+}
+
 /// Reads a capture's file; a missing file means the capture is gone.
 fn read_capture_file(id: &CaptureId, path: &Path) -> Result<Vec<u8>, LibraryError> {
     fs::read(path).map_err(|e| match e.kind() {
@@ -261,6 +275,7 @@ impl CaptureLibrary {
         std::thread::Builder::new()
             .name("snipt-index-loader".to_owned())
             .spawn(move || {
+                prepare_import(&layout);
                 let (index, _) = LibraryIndex::load(&layout);
                 loader.finish_loading(&layout, index);
             })
@@ -379,6 +394,7 @@ impl CaptureLibrary {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .take();
+            prepare_import(&layout);
             let (index, _) = LibraryIndex::load(&layout);
             log::info!(
                 "library: switched from {} to {}",
@@ -847,11 +863,15 @@ impl CaptureLibrary {
     pub fn delete(&self, ids: &[CaptureId]) -> Result<DeleteOutcome, LibraryError> {
         let mut seen = HashSet::new();
         let ids: Vec<CaptureId> = ids.iter().filter(|id| seen.insert(*id)).cloned().collect();
-        // Outside the lock: flushing an editor calls `save_annotations`.
+        // Outside the lock: flushing an editor calls `save_annotations`. Each close may wait for
+        // its flush, so they run together and the wait is one timeout, not one per capture.
         if let Some(editor) = (self.editor)() {
-            for id in &ids {
-                editor.close_editor(id);
-            }
+            std::thread::scope(|scope| {
+                for id in &ids {
+                    let editor = &editor;
+                    scope.spawn(move || editor.close_editor(id));
+                }
+            });
         }
 
         let mut outcome = DeleteOutcome::default();
