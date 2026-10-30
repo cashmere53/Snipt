@@ -114,7 +114,7 @@ graph TB
 src-tauri/
 ├── Cargo.toml                      # 依存定義(各 spec が自分の依存を追記)
 ├── tauri.conf.json                 # identifier=app.snipt, app.windows=[], バンドル設定
-├── capabilities/app-shell.json     # windows:["settings"] に core:default, dialog:allow-open
+├── capabilities/app-shell.json     # windows:["settings"] に core:event:allow-listen / allow-unlisten, core:window:allow-close, dialog:allow-open
 └── src/
     ├── main.rs                     # snipt_lib::run() を呼ぶだけ
     ├── lib.rs                      # コンポジションルート: プラグイン順、2 段階 setup、invoke_handler(spec 別区画)、RunEvent
@@ -529,7 +529,7 @@ impl BeforeExitHooks {
 - **Performance**: ホットキー押下から `request_capture` 呼出まで 10ms 未満(app-shell 内はロック 1 回 + 転送のみ)。待機中に app-shell 起因のポーリング・タイマーを持たない。
 
 ## Security Considerations
-- WebView に global-shortcut / autostart の permission を与えない(Rust 側のみが操作)。`settings` ウィンドウの capability は `core:default`, `dialog:allow-open` と app-shell の command のみ。
+- WebView に global-shortcut / autostart の permission を与えない(Rust 側のみが操作)。`settings` ウィンドウの capability は `core:event:allow-listen` / `allow-unlisten`(設定変更イベントの購読)、`core:window:allow-close`(閉じるボタン)、`dialog:allow-open`(保存先の選択)と app-shell の command のみ。
 - `save_dir` は Rust 側で絶対パス化・書き込み検証してから確定する。
 
 ## Open Questions / Risks

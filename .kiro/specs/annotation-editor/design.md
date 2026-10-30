@@ -675,7 +675,7 @@ export interface AutosaveController {
 - 書き込み先はダイアログ由来のトークンのみ、保存先はラベル由来の ID のみ。capture-library のパスは TS へ渡さない。モザイクは不透明ブロック置換でガウスぼかしは使わない(6.3)。
 - capability `src-tauri/capabilities/editor.json`(`windows: ["editor-*"]`)は、編集画面が使う最小の権限だけを付与する: `core:event:allow-listen`、`core:event:allow-unlisten`、`core:window:allow-destroy`、本 spec の command 7 本(`allow-editor-*`)。
   - `core:event:allow-listen` / `allow-unlisten` は `window-port.ts` の `listen`・`onCloseRequested` と購読解除に、`core:window:allow-destroy` は `window-port.ts` の `destroy` に使う。
-  - 他のウィンドウ(`history.json`・`app-shell.json` など)の capability は `core:default` のままで、編集画面だけを絞っている。
+  - 他のウィンドウ(`history.json`・`app-shell.json`・`overlay.json`)の capability も、それぞれが使う最小の権限だけを付与している。
   - app-shell・history の capability に `allow-editor-*` が無いことは `commands/tests.rs` で確認する。
 
 ## Open Questions / Risks

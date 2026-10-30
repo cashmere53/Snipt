@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "history",
-  "description": "Permissions for the history window: core defaults and the capture-library commands. Ids only; paths never come from the webview.",
+  "description": "Permissions for the history window: listening for library events and the capture-library commands. Ids only; paths never come from the webview.",
   "windows": ["history"],
   "permissions": [
-    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "allow-library-list",
     "allow-library-open-in-editor",
     "allow-library-copy",
