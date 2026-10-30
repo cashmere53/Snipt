@@ -40,11 +40,16 @@ pub fn copy_image(image: ClipboardImage<'_>) -> Result<(), ClipboardError> {
         }
     };
 
+    set_image_formats(&dib, png)
+}
+
+/// Replaces the clipboard contents with the built `CF_DIBV5` and PNG bytes, in one session.
+pub fn set_image_formats(dib: &[u8], png: &[u8]) -> Result<(), ClipboardError> {
     let _session = ClipboardSession::open()?;
     // SAFETY: the clipboard is open on this thread for the lifetime of `_session`.
     unsafe {
         EmptyClipboard().map_err(win32)?;
-        set_bytes(u32::from(CF_DIBV5.0), &dib)?;
+        set_bytes(u32::from(CF_DIBV5.0), dib)?;
         let png_format = RegisterClipboardFormatW(w!("PNG"));
         if png_format == 0 {
             return Err(win32(windows::core::Error::from_thread()));

@@ -89,6 +89,7 @@ mise run install   # フロントエンドの依存関係をインストール
 | `mise run check:web`    | フロントエンドの型検査・lint・フォーマット確認・テスト          |
 | `mise run check:rust`   | Rust の `cargo fmt --check`・`clippy -D warnings`・`cargo test` |
 | `mise run perf:library` | capture-library の性能測定(release ビルド)                      |
+| `mise run perf:editor`  | annotation-editor のコピーの性能測定(release ビルド)            |
 | `mise run e2e`          | Windows 実機の E2E テスト(E2E 用ビルド + tauri-driver)          |
 
 `mise tasks` で一覧を確認できます。CI(GitHub Actions、`windows-latest`)は `jdx/mise-action` で同じツールを揃え、`check:web`・`check:rust` と `pnpm tauri build --no-bundle` を実行します。
@@ -107,7 +108,7 @@ mise run e2e   # E2E 用ビルド(--features e2e)→ テスト実行
 - tauri-driver は `e2e` タスクの実行時に mise が入れます。msedgedriver は、インストール済みの WebView2 Runtime と同じ版を初回に `e2e/.drivers/` へダウンロードします。
 - E2E 用ビルドは `e2e` feature 付きのデバッグビルド(出力先は `src-tauri/target/e2e/`)で、通常のビルドとは次の 2 点が違います。設定を `SNIPT_E2E_CONFIG_DIR` から読むこと、起動時に履歴ウィンドウを開くこと(tauri-driver が接続するため)です。利用者の設定・保存フォルダ・WebView2 のデータには触れません。
 - テスト用キャプチャは、一時フォルダの保存先へ `Snipt_<id>.png`(`snipt:meta` 付きの単色 PNG、`e2e/support/png.ts`)として置きます。起動時に履歴へ取り込まれます。テスト用の設定は撮影ホットキーを `Ctrl+Alt+Shift+F7` / `F8` / `F9` にしています。
-- 性能は `e2e/specs/editor-perf.e2e.ts` で計測します(11520×2160 の画像。開く要求からウィンドウ表示まで ≤ 700 ms、Ctrl+C から合成 PNG の要求まで ≤ 2.5 秒、ドラッグは 60fps 付近)。結果は `E2E perf:` の行に出ます。Ctrl+C からコピー完了(約 8.5 秒)、クリップボードに画像が出るまで(約 8.9 秒)はデバッグ版の E2E ビルドで出力のみし、アサートしていません。その時間の大半は Rust の `copy_png`(PNG のデコードと DIB への変換)で、合成 PNG 生成の計測範囲の外です。リリースビルドの値は計測していません。
+- 性能は `e2e/specs/editor-perf.e2e.ts` で計測します(11520×2160 の画像。開く要求からウィンドウ表示まで ≤ 700 ms、Ctrl+C から合成 PNG の要求まで ≤ 2.5 秒、ドラッグは 60fps 付近)。結果は `E2E perf:` の行に出ます。Ctrl+C からコピー完了(約 8.5 秒)、クリップボードに画像が出るまで(約 8.9 秒)はデバッグ版の E2E ビルドで出力のみし、アサートしていません。その時間の大半は Rust の `copy_png`(PNG のデコードと DIB への変換)で、合成 PNG 生成の計測範囲の外です。リリースビルドの値は `mise run perf:editor` で計測します(実際のクリップボードを使い、終了後に空にします)。
 - `SNIPT_E2E_KEEP=1` を付けると、終了後も一時フォルダ(設定・保存先・WebView2 のデータ)を残します。
 - 終了の E2E は、起動中のアプリへ `snipt.exe --e2e-quit` を渡すと、トレイの「終了」と同じ経路で終了します(E2E 用ビルドだけの動作。トレイのメニューは操作できないため)。終了確認は Windows の UI Automation で読み、ボタンを押します。
 

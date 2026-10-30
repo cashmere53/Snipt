@@ -34,6 +34,11 @@ description = "Measure capture-library performance (release build; prints the re
 dir = "src-tauri"
 run = "cargo test --release --locked --lib capture_library::perf_tests -- --ignored --nocapture --test-threads=1"
 
+[tasks."perf:editor"]
+description = "Measure the editor's copy path (release build; prints the results; uses the clipboard)"
+dir = "src-tauri"
+run = "cargo test --release --locked --lib annotation_editor::perf_tests -- --ignored --nocapture --test-threads=1"
+
 [tasks.check]
 description = "Run every check that CI runs"
 depends = ["check:web", "check:rust"]
