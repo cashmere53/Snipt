@@ -105,20 +105,6 @@ export async function waitForNewEditor(
   );
 }
 
-/** The window title as Tauri set it (the editor's is `Snipt - YYYY/MM/DD HH:MM:SS`). */
-export async function windowTitle(browser: Browser): Promise<string> {
-  return browser.execute(async () => {
-    type Internals = {
-      invoke(cmd: string, args: unknown): Promise<string>;
-      metadata: { currentWindow: { label: string } };
-    };
-    const internals = Reflect.get(window, "__TAURI_INTERNALS__") as Internals;
-    return internals.invoke("plugin:window|title", {
-      label: internals.metadata.currentWindow.label,
-    });
-  });
-}
-
 export async function openFromHistory(browser: Browser, ariaLabel: string): Promise<void> {
   await switchTo(browser, "history");
   const tile = await browser.$(`[role="option"][aria-label="${ariaLabel}"]`);

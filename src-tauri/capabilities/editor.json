@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "annotation-editor",
-  "description": "Permissions for the editor windows: core defaults (event listening included), destroying the window itself after its annotations are flushed, and the annotation-editor commands. Paths never come from the webview.",
+  "description": "Permissions for the editor windows: listening for and unlistening from the events Rust sends it (and its own close request), destroying the window itself after its annotations are flushed, and the annotation-editor commands. Paths never come from the webview.",
   "windows": ["editor-*"],
   "permissions": [
-    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-destroy",
     "allow-editor-open-session",
     "allow-editor-read-original",

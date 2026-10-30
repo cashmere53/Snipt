@@ -109,7 +109,7 @@ graph TB
 ### Directory Structure
 ```
 src-tauri/
-├── capabilities/editor.json            # windows: ["editor-*"]。core:default、core:window:allow-destroy、本 spec の command 7 本のみ(詳細は Security Considerations)
+├── capabilities/editor.json            # windows: ["editor-*"]。core:event:allow-listen / allow-unlisten、core:window:allow-destroy、本 spec の command 7 本のみ(詳細は Security Considerations)
 └── src/
     ├── shared/editor_launcher.rs       # trait EditorLauncher(本 spec が定義、他 spec が利用。shared/mod.rs に mod 追加)
     └── annotation_editor/
@@ -673,9 +673,9 @@ export interface AutosaveController {
 
 ## Security Considerations
 - 書き込み先はダイアログ由来のトークンのみ、保存先はラベル由来の ID のみ。capture-library のパスは TS へ渡さない。モザイクは不透明ブロック置換でガウスぼかしは使わない(6.3)。
-- capability `src-tauri/capabilities/editor.json`(`windows: ["editor-*"]`)は次を付与する: `core:default`、`core:window:allow-destroy`、本 spec の command 7 本(`allow-editor-*`)。
-  - 実装の `core:default` は `core` の既定セット(app・event・image・menu・path・resources・tray・webview・window の既定権限)全体で、編集画面が使う範囲より広い。これは `history.json`(`core:default`)や `app-shell.json`(`core:default`)など他のウィンドウの capability と揃えたもの。
-  - 編集画面が Tauri の JS API で実際に使うのは、`core:event:allow-listen` と `core:event:allow-unlisten`(`window-port.ts` の `listen` / `onCloseRequested` と購読解除)、`core:window:allow-destroy`(`window-port.ts` の `destroy`)だけ。`core:default` を絞る場合の最小の権限集合はこの 3 つに本 spec の 7 command を加えたもの。
+- capability `src-tauri/capabilities/editor.json`(`windows: ["editor-*"]`)は、編集画面が使う最小の権限だけを付与する: `core:event:allow-listen`、`core:event:allow-unlisten`、`core:window:allow-destroy`、本 spec の command 7 本(`allow-editor-*`)。
+  - `core:event:allow-listen` / `allow-unlisten` は `window-port.ts` の `listen`・`onCloseRequested` と購読解除に、`core:window:allow-destroy` は `window-port.ts` の `destroy` に使う。
+  - 他のウィンドウ(`history.json`・`app-shell.json` など)の capability は `core:default` のままで、編集画面だけを絞っている。
   - app-shell・history の capability に `allow-editor-*` が無いことは `commands/tests.rs` で確認する。
 
 ## Open Questions / Risks
