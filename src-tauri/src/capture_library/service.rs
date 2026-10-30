@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, ErrorKind};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 use std::time::{Duration, Instant};
 
@@ -33,6 +34,8 @@ use crate::shared::{CaptureId, EditorLauncher, ExitCheck, Notice, NoticeLevel, N
 
 /// Index writes requested within this window are merged into one.
 const PERSIST_DELAY: Duration = Duration::from_millis(300);
+/// How many editors `delete` closes at the same time.
+const CLOSE_WORKERS: usize = 8;
 
 const SAVE_FAILED_TITLE: &str = "キャプチャを保存できませんでした";
 const SAVE_FAILED_HINT: &str =
@@ -102,8 +105,8 @@ fn layout_of(item: &CaptureItem) -> LibraryLayout {
 }
 
 /// Creates `.snipt` in an existing folder before it is imported. The cache and every thumbnail
-/// of an imported folder are written there, while only the save path used to create it. A
-/// folder that does not exist yet is left to the first save.
+/// are written there; normally the first save creates it, but an imported folder may not have
+/// been saved to yet. A folder that does not exist yet is left to the first save.
 fn prepare_import(layout: &LibraryLayout) {
     if layout.root().is_dir() {
         if let Err(e) = layout.ensure_dirs() {
@@ -864,12 +867,17 @@ impl CaptureLibrary {
         let mut seen = HashSet::new();
         let ids: Vec<CaptureId> = ids.iter().filter(|id| seen.insert(*id)).cloned().collect();
         // Outside the lock: flushing an editor calls `save_annotations`. Each close may wait for
-        // its flush, so they run together and the wait is one timeout, not one per capture.
+        // its flush, so a few workers share them and the wait is one timeout, not one per
+        // capture. Most ids have no open editor and return at once.
         if let Some(editor) = (self.editor)() {
+            let next = AtomicUsize::new(0);
             std::thread::scope(|scope| {
-                for id in &ids {
-                    let editor = &editor;
-                    scope.spawn(move || editor.close_editor(id));
+                for _ in 0..ids.len().min(CLOSE_WORKERS) {
+                    scope.spawn(|| {
+                        while let Some(id) = ids.get(next.fetch_add(1, Ordering::Relaxed)) {
+                            editor.close_editor(id);
+                        }
+                    });
                 }
             });
         }

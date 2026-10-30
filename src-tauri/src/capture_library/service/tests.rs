@@ -39,6 +39,9 @@ struct FakeEditor {
     library: OnceLock<Weak<CaptureLibrary>>,
     /// How long a close takes, as a flush does.
     close_delay: Duration,
+    /// Closes running now, and the most that ran at once.
+    closing: AtomicUsize,
+    most_closing: AtomicUsize,
 }
 
 impl EditorLauncher for FakeEditor {
@@ -50,7 +53,10 @@ impl EditorLauncher for FakeEditor {
     }
 
     fn close_editor(&self, id: &CaptureId) {
+        let closing = self.closing.fetch_add(1, Ordering::SeqCst) + 1;
+        self.most_closing.fetch_max(closing, Ordering::SeqCst);
         std::thread::sleep(self.close_delay);
+        self.closing.fetch_sub(1, Ordering::SeqCst);
         let library = self.library.get().and_then(Weak::upgrade).unwrap();
         // Background work (thumbnails) may hold the lock for a moment; a lock held by the
         // caller would never be released while this call blocks it.
@@ -703,6 +709,37 @@ fn deleting_many_captures_waits_for_their_editors_together() {
         h.desktop.calls().last(),
         Some(DesktopCall::Recycle(files)) if files.len() == 3
     ));
+}
+
+#[test]
+fn deleting_many_captures_closes_each_editor_on_a_few_threads() {
+    let h = Harness::with_editor(
+        "Pictures/Snipt",
+        FakeEditor {
+            close_delay: Duration::from_millis(5),
+            ..FakeEditor::default()
+        },
+    );
+    let ids: Vec<CaptureId> = (0..40).map(|second| h.save(second).id).collect();
+
+    let outcome = h.library.delete(&ids).unwrap();
+
+    assert_eq!(outcome.removed, ids);
+    let mut closed: Vec<CaptureId> = h
+        .editor
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|call| match call {
+            EditorCall::Close { id, .. } => Some(id.clone()),
+            EditorCall::Open(_) => None,
+        })
+        .collect();
+    closed.sort();
+    assert_eq!(closed, ids);
+    let most = h.editor.most_closing.load(Ordering::SeqCst);
+    assert!((2..=CLOSE_WORKERS).contains(&most), "{most}");
 }
 
 #[test]
