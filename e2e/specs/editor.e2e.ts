@@ -16,7 +16,6 @@ import {
   switchTo,
   waitForNewEditor,
   waitUntil,
-  windowTitle,
 } from "../support/app";
 import { Desktop } from "../support/desktop";
 import { abortSessionStart, HOTKEYS, type Session, startSession } from "../support/driver";
@@ -98,8 +97,9 @@ describe("annotation-editor E2E", () => {
     // Capturing, saving and creating the window take a few seconds in the debug build.
     const label = await waitForNewEditor(browser, before, 30_000);
     await switchTo(browser, label);
-    const title = await windowTitle(browser);
-    expect(title).toMatch(/^Snipt - \d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}/);
+    // The editor cannot read its own title (its capability has no window:allow-title); the
+    // foreground check against the title built from the label also checks what Rust set.
+    const title = editorTitle(label.replace(/^editor-/, ""));
     await waitForForeground(title);
     captured = { label, title };
 
