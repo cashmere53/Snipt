@@ -10,6 +10,9 @@ pub mod ports;
 pub mod session;
 pub mod window_manager;
 
+#[cfg(test)]
+mod perf_tests;
+
 use std::sync::Arc;
 
 use tauri::{App, Manager, Runtime};

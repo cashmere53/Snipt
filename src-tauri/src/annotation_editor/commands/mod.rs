@@ -149,12 +149,17 @@ pub async fn editor_save<R: Runtime>(
     logged("save", &id, result)
 }
 
+/// Decodes the composite PNG to straight RGBA8.
+pub(crate) fn decode_composite(png: &[u8]) -> Result<image::RgbaImage, EditorError> {
+    image::load_from_memory_with_format(png, image::ImageFormat::Png)
+        .map(|image| image.to_rgba8())
+        .map_err(|e| EditorError::InvalidPayload(format!("合成画像を読み取れません: {e}")))
+}
+
 /// Decodes the composite PNG and hands both the pixels and the PNG to the clipboard (no
 /// re-encoding).
-fn copy_png(desktop: &dyn EditorDesktop, png: &[u8]) -> Result<(), EditorError> {
-    let image = image::load_from_memory_with_format(png, image::ImageFormat::Png)
-        .map_err(|e| EditorError::InvalidPayload(format!("合成画像を読み取れません: {e}")))?
-        .to_rgba8();
+pub(crate) fn copy_png(desktop: &dyn EditorDesktop, png: &[u8]) -> Result<(), EditorError> {
+    let image = decode_composite(png)?;
     desktop.copy_image(ClipboardImage {
         width: image.width(),
         height: image.height(),
