@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, ErrorKind};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 use std::time::{Duration, Instant};
 
@@ -33,6 +34,8 @@ use crate::shared::{CaptureId, EditorLauncher, ExitCheck, Notice, NoticeLevel, N
 
 /// Index writes requested within this window are merged into one.
 const PERSIST_DELAY: Duration = Duration::from_millis(300);
+/// How many editors `delete` closes at the same time.
+const CLOSE_WORKERS: usize = 8;
 
 const SAVE_FAILED_TITLE: &str = "キャプチャを保存できませんでした";
 const SAVE_FAILED_HINT: &str =
@@ -99,6 +102,20 @@ fn layout_of(item: &CaptureItem) -> LibraryLayout {
             .unwrap_or(Path::new("."))
             .to_owned(),
     )
+}
+
+/// Creates `.snipt` in an existing folder before it is imported. The cache and every thumbnail
+/// are written there; normally the first save creates it, but an imported folder may not have
+/// been saved to yet. A folder that does not exist yet is left to the first save.
+fn prepare_import(layout: &LibraryLayout) {
+    if layout.root().is_dir() {
+        if let Err(e) = layout.ensure_dirs() {
+            log::warn!(
+                "library: could not prepare {}: {e}",
+                layout.root().display()
+            );
+        }
+    }
 }
 
 /// Reads a capture's file; a missing file means the capture is gone.
@@ -261,6 +278,7 @@ impl CaptureLibrary {
         std::thread::Builder::new()
             .name("snipt-index-loader".to_owned())
             .spawn(move || {
+                prepare_import(&layout);
                 let (index, _) = LibraryIndex::load(&layout);
                 loader.finish_loading(&layout, index);
             })
@@ -379,6 +397,7 @@ impl CaptureLibrary {
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
                 .take();
+            prepare_import(&layout);
             let (index, _) = LibraryIndex::load(&layout);
             log::info!(
                 "library: switched from {} to {}",
@@ -847,11 +866,20 @@ impl CaptureLibrary {
     pub fn delete(&self, ids: &[CaptureId]) -> Result<DeleteOutcome, LibraryError> {
         let mut seen = HashSet::new();
         let ids: Vec<CaptureId> = ids.iter().filter(|id| seen.insert(*id)).cloned().collect();
-        // Outside the lock: flushing an editor calls `save_annotations`.
+        // Outside the lock: flushing an editor calls `save_annotations`. Each close may wait for
+        // its flush, so a few workers share them and the wait is one timeout, not one per
+        // capture. Most ids have no open editor and return at once.
         if let Some(editor) = (self.editor)() {
-            for id in &ids {
-                editor.close_editor(id);
-            }
+            let next = AtomicUsize::new(0);
+            std::thread::scope(|scope| {
+                for _ in 0..ids.len().min(CLOSE_WORKERS) {
+                    scope.spawn(|| {
+                        while let Some(id) = ids.get(next.fetch_add(1, Ordering::Relaxed)) {
+                            editor.close_editor(id);
+                        }
+                    });
+                }
+            });
         }
 
         let mut outcome = DeleteOutcome::default();

@@ -37,6 +37,11 @@ enum EditorCall {
 struct FakeEditor {
     calls: Mutex<Vec<EditorCall>>,
     library: OnceLock<Weak<CaptureLibrary>>,
+    /// How long a close takes, as a flush does.
+    close_delay: Duration,
+    /// Closes running now, and the most that ran at once.
+    closing: AtomicUsize,
+    most_closing: AtomicUsize,
 }
 
 impl EditorLauncher for FakeEditor {
@@ -48,6 +53,10 @@ impl EditorLauncher for FakeEditor {
     }
 
     fn close_editor(&self, id: &CaptureId) {
+        let closing = self.closing.fetch_add(1, Ordering::SeqCst) + 1;
+        self.most_closing.fetch_max(closing, Ordering::SeqCst);
+        std::thread::sleep(self.close_delay);
+        self.closing.fetch_sub(1, Ordering::SeqCst);
         let library = self.library.get().and_then(Weak::upgrade).unwrap();
         // Background work (thumbnails) may hold the lock for a moment; a lock held by the
         // caller would never be released while this call blocks it.
@@ -82,12 +91,16 @@ struct Harness {
 impl Harness {
     /// A library on `<tmp>/<relative>`, created lazily by the first save.
     fn at(relative: &str) -> Self {
+        Self::with_editor(relative, FakeEditor::default())
+    }
+
+    fn with_editor(relative: &str, editor: FakeEditor) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join(relative);
         let desktop = Arc::new(RecordingDesktop::default());
         let notices = Arc::new(Notices::default());
         let events = Arc::new(Mutex::new(Vec::new()));
-        let editor = Arc::new(FakeEditor::default());
+        let editor = Arc::new(editor);
         let served = Arc::new(Mutex::new(Vec::new()));
         let library = CaptureLibrary::open(LibraryDeps {
             save_dir: root.clone(),
@@ -330,6 +343,58 @@ fn invalid_input_is_reported_without_keeping_anything() {
         h.library.load_for_edit(&err.unsaved.id).unwrap_err().kind(),
         "notFound"
     );
+}
+
+// --- 1.5 / 4.2 ---
+
+#[test]
+fn an_imported_folder_without_snipt_gets_its_thumbnails() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("Pictures").join("Snipt");
+    fs::create_dir_all(&root).unwrap();
+    let capture_id = id("20261022_174150");
+    let png = png_meta::encode(
+        &CaptureImage::Rgba {
+            width: 4,
+            height: 3,
+            pixels: [10, 20, 30, 255].repeat(12),
+        },
+        &SniptMetaV1 {
+            v: 1,
+            id: capture_id.clone(),
+            captured_at: at(50).fixed_offset(),
+            mode: CaptureMode::Window,
+            window_title: None,
+        },
+    )
+    .unwrap();
+    fs::write(root.join("Snipt_20261022_174150.png"), png).unwrap();
+    let layout = LibraryLayout::new(root.clone());
+    assert!(!layout.snipt_dir().exists());
+
+    let library = CaptureLibrary::open(LibraryDeps {
+        save_dir: root.clone(),
+        desktop: Box::new(RecordingDesktop::default()),
+        notifier: Arc::new(Notices::default()),
+        events: Box::new(|_| {}),
+        editor: Box::new(|| None),
+        serve_thumbnails: Box::new(|_| {}),
+    });
+
+    let mut thumbnail = None;
+    for _ in 0..500 {
+        thumbnail = library
+            .list()
+            .into_iter()
+            .find(|item| item.id == capture_id)
+            .and_then(|item| item.thumbnail_path);
+        if thumbnail.is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(thumbnail, Some(layout.thumbnail(&capture_id)));
+    assert!(layout.thumbnail(&capture_id).is_file());
 }
 
 // --- 5.4 ---
@@ -616,6 +681,65 @@ fn delete_closes_editors_outside_the_lock_then_recycles_all_files() {
         h.library.load_for_edit(&item.id).unwrap_err().kind(),
         "notFound"
     );
+}
+
+#[test]
+fn deleting_many_captures_waits_for_their_editors_together() {
+    let close_delay = Duration::from_millis(300);
+    let h = Harness::with_editor(
+        "Pictures/Snipt",
+        FakeEditor {
+            close_delay,
+            ..FakeEditor::default()
+        },
+    );
+    let ids: Vec<CaptureId> = (50..53).map(|second| h.save(second).id).collect();
+
+    let started = std::time::Instant::now();
+    let outcome = h.library.delete(&ids).unwrap();
+    let elapsed = started.elapsed();
+
+    assert_eq!(outcome.removed, ids);
+    assert!(outcome.failed.is_empty());
+    assert_eq!(h.editor.calls.lock().unwrap().len(), 3);
+    // Closed one after another this takes at least 3 × 300 ms; closed together it takes about
+    // 300 ms. The bound leaves room for a slow machine.
+    assert!(elapsed < Duration::from_millis(800), "{elapsed:?}");
+    assert!(matches!(
+        h.desktop.calls().last(),
+        Some(DesktopCall::Recycle(files)) if files.len() == 3
+    ));
+}
+
+#[test]
+fn deleting_many_captures_closes_each_editor_on_a_few_threads() {
+    let h = Harness::with_editor(
+        "Pictures/Snipt",
+        FakeEditor {
+            close_delay: Duration::from_millis(5),
+            ..FakeEditor::default()
+        },
+    );
+    let ids: Vec<CaptureId> = (0..40).map(|second| h.save(second).id).collect();
+
+    let outcome = h.library.delete(&ids).unwrap();
+
+    assert_eq!(outcome.removed, ids);
+    let mut closed: Vec<CaptureId> = h
+        .editor
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|call| match call {
+            EditorCall::Close { id, .. } => Some(id.clone()),
+            EditorCall::Open(_) => None,
+        })
+        .collect();
+    closed.sort();
+    assert_eq!(closed, ids);
+    let most = h.editor.most_closing.load(Ordering::SeqCst);
+    assert!((2..=CLOSE_WORKERS).contains(&most), "{most}");
 }
 
 #[test]
